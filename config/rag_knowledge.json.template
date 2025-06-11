@@ -1,0 +1,53 @@
+{
+  "_comment": "RAG Knowledge Base Configuration Template", 
+  "_instructions": "For RAG systems: Copy to rag_knowledge.json, update sources, optimized for retrieval",
+  
+  "microservice_url": "http://localhost:8000",
+  
+  "sources": [
+    {
+      "_example": "Company documentation",
+      "type": "url",
+      "path": "https://docs.your-company.com",
+      "output_prefix": "company_docs"
+    },
+    {
+      "_example": "Policy documents",
+      "type": "directory",
+      "path": "./knowledge_base/policies/",
+      "recursive": true,
+      "include_patterns": ["*.pdf", "*.docx"],
+      "exclude_patterns": ["*draft*"],
+      "output_prefix": "policies"
+    },
+    {
+      "_example": "FAQ and support",
+      "type": "url",
+      "path": "https://your-company.com/support/faq",
+      "output_prefix": "faq"
+    },
+    {
+      "_example": "Product manuals",
+      "type": "file",
+      "path": "./knowledge_base/product_manual.pdf",
+      "output_prefix": "manual"
+    }
+  ],
+  
+  "processing": {
+    "_comment": "RAG-optimized settings",
+    "output_format": "documents",
+    "chunking_strategy": "by_title",
+    "max_chunk_size": 600,
+    "chunk_overlap": 100,
+    "include_metadata": true,
+    "min_text_length": 50,
+    "remove_headers_footers": true
+  },
+  
+  "batch_options": {
+    "max_workers": 3,
+    "continue_on_error": true,
+    "merge_all": true
+  }
+}

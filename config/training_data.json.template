@@ -1,0 +1,41 @@
+{
+  "_comment": "Training Data Configuration Template",
+  "_instructions": "For model training: Copy to training_data.json, update sources, use text output",
+  
+  "microservice_url": "http://localhost:8000",
+  
+  "sources": [
+    {
+      "_example": "Training documents directory",
+      "type": "directory",
+      "path": "./training_data/documents/",
+      "recursive": true,
+      "include_patterns": ["*.txt", "*.md", "*.pdf"],
+      "exclude_patterns": ["*test*", "*sample*"],
+      "output_prefix": "training_corpus"
+    },
+    {
+      "_example": "Web content for training",
+      "type": "url",
+      "path": "https://your-domain.com/articles",
+      "output_prefix": "web_content"
+    }
+  ],
+  
+  "processing": {
+    "_comment": "Clean text output for training",
+    "output_format": "text",
+    "chunking_strategy": "basic",
+    "max_chunk_size": 2000,
+    "chunk_overlap": 50,
+    "include_metadata": false,
+    "min_text_length": 100,
+    "remove_headers_footers": true
+  },
+  
+  "batch_options": {
+    "max_workers": 2,
+    "continue_on_error": true,
+    "merge_all": true
+  }
+}

@@ -44,7 +44,7 @@ graph TD
 
 ```bash
 # 1. Deploy the service
-curl -O https://raw.githubusercontent.com/your-repo/universal-data-loader/main/docker-compose.yml
+# Using the local docker-compose.yml file
 docker-compose up -d
 
 # 2. Test it works
@@ -216,7 +216,7 @@ unstructured/
 
 ## 🚀 Next Steps for Integration
 
-1. **Deploy the container**: `./deploy.sh development`
+1. **Deploy the container**: `docker-compose up -d`
 2. **Read the integration guide**: `INTEGRATION_GUIDE.md`
 3. **Test with your documents**: Use the API endpoints
 4. **Integrate with your LLM app**: Use provided client libraries

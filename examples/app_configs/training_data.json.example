@@ -1,0 +1,35 @@
+{
+  "sources": [
+    {
+      "type": "directory",
+      "path": "/path/to/your/training/documents/",
+      "recursive": true,
+      "include_patterns": ["*.txt", "*.md", "*.pdf"],
+      "exclude_patterns": ["*test*", "*sample*"],
+      "output_prefix": "training_corpus"
+    },
+    {
+      "type": "url",
+      "path": "https://your-domain.com/articles",
+      "output_prefix": "web_content"
+    }
+  ],
+  "loader_config": {
+    "output_format": "text",
+    "chunking_strategy": "basic",
+    "max_chunk_size": 2000,
+    "chunk_overlap": 50,
+    "include_metadata": false,
+    "min_text_length": 100,
+    "remove_headers_footers": true
+  },
+  "output": {
+    "base_path": "training_data_output",
+    "separate_by_source": false,
+    "merge_all": true,
+    "filename_template": "clean_training_data"
+  },
+  "max_workers": 2,
+  "continue_on_error": true,
+  "verbose": true
+}

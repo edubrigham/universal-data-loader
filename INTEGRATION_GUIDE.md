@@ -10,9 +10,17 @@ The Universal Data Loader is a containerized microservice that converts document
 
 ### Step 1: Deploy the Container
 
+> **Note:** If this repository is private, you'll need to clone it locally first or use authentication with curl. The examples below show both options.
+
 ```bash
 # Option A: Docker Compose (Recommended)
-curl -O https://raw.githubusercontent.com/your-repo/universal-data-loader/main/docker-compose.yml
+# If the repository is public:
+curl -O https://raw.githubusercontent.com/edubrigham/universal-data-loader/main/docker-compose.yml
+
+# If the repository is private or you have cloned it locally:
+# Use the docker-compose.yml file from your local clone
+
+# Start the service
 docker-compose up -d
 
 # Option B: Direct Docker Run

@@ -1,0 +1,48 @@
+{
+  "_comment": "Universal Data Loader Configuration Template",
+  "_instructions": "1. Copy this file to documents.json, 2. Update the sources with your URLs/files/directories, 3. Adjust processing settings as needed",
+  
+  "microservice_url": "http://localhost:8000",
+  
+  "sources": [
+    {
+      "_example": "URL source",
+      "type": "url",
+      "path": "https://docs.your-company.com",
+      "output_prefix": "company_docs"
+    },
+    {
+      "_example": "Local file",
+      "type": "file", 
+      "path": "./data/handbook.pdf",
+      "output_prefix": "handbook"
+    },
+    {
+      "_example": "Directory with filtering",
+      "type": "directory",
+      "path": "./data/documents/",
+      "recursive": true,
+      "include_patterns": ["*.pdf", "*.docx", "*.md"],
+      "exclude_patterns": ["*draft*", "*temp*"],
+      "output_prefix": "local_docs"
+    }
+  ],
+  
+  "processing": {
+    "_comment": "Document processing settings",
+    "output_format": "documents",
+    "chunking_strategy": "by_title",
+    "max_chunk_size": 600,
+    "chunk_overlap": 100,
+    "include_metadata": true,
+    "min_text_length": 50,
+    "remove_headers_footers": true
+  },
+  
+  "batch_options": {
+    "_comment": "Batch processing settings",
+    "max_workers": 3,
+    "continue_on_error": true,
+    "merge_all": true
+  }
+}

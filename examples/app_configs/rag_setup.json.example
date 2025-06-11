@@ -1,0 +1,45 @@
+{
+  "sources": [
+    {
+      "type": "url",
+      "path": "https://docs.your-company.com",
+      "output_prefix": "company_docs"
+    },
+    {
+      "type": "url", 
+      "path": "https://your-company.com/policies",
+      "output_prefix": "policies"
+    },
+    {
+      "type": "directory",
+      "path": "/path/to/your/documents/",
+      "recursive": true,
+      "include_patterns": ["*.pdf", "*.docx", "*.md"],
+      "exclude_patterns": ["*draft*", "*temp*"],
+      "output_prefix": "local_docs"
+    },
+    {
+      "type": "file",
+      "path": "/path/to/your/handbook.pdf",
+      "output_prefix": "handbook"
+    }
+  ],
+  "loader_config": {
+    "output_format": "documents",
+    "chunking_strategy": "by_title",
+    "max_chunk_size": 600,
+    "chunk_overlap": 100,
+    "include_metadata": true,
+    "min_text_length": 50,
+    "remove_headers_footers": true
+  },
+  "output": {
+    "base_path": "rag_knowledge_base",
+    "separate_by_source": true,
+    "merge_all": true,
+    "filename_template": "{source_name}_rag_ready"
+  },
+  "max_workers": 3,
+  "continue_on_error": true,
+  "verbose": true
+}

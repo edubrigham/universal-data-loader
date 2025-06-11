@@ -42,6 +42,7 @@ Thumbs.db
 examples/test_data/
 *.json
 *.txt
+!requirements.txt
 test-*
 *test*
 improved-*

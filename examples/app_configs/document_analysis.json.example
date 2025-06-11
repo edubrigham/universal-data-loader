@@ -1,0 +1,38 @@
+{
+  "sources": [
+    {
+      "type": "file",
+      "path": "/path/to/your/report.pdf",
+      "output_prefix": "quarterly_report"
+    },
+    {
+      "type": "file",
+      "path": "/path/to/your/presentation.pptx",
+      "output_prefix": "board_presentation"
+    },
+    {
+      "type": "directory",
+      "path": "/path/to/your/contracts/",
+      "recursive": false,
+      "include_patterns": ["*.pdf", "*.docx"],
+      "output_prefix": "contracts"
+    }
+  ],
+  "loader_config": {
+    "output_format": "documents",
+    "chunking_strategy": null,
+    "include_metadata": true,
+    "min_text_length": 30,
+    "remove_headers_footers": false,
+    "extract_images": false
+  },
+  "output": {
+    "base_path": "document_analysis_output",
+    "separate_by_source": true,
+    "merge_all": false,
+    "filename_template": "{source_name}_analyzed"
+  },
+  "max_workers": 1,
+  "continue_on_error": false,
+  "verbose": true
+}
