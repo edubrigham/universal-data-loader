@@ -6,7 +6,7 @@ import argparse
 import sys
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from .loader import UniversalDataLoader
 from .config import LoaderConfig, OutputFormat, ChunkingStrategy
@@ -19,6 +19,13 @@ from .utils import (
     count_elements_by_type
 )
 from .document import DocumentCollection
+from .batch_processor import (
+    BatchProcessor, 
+    process_batch_from_config_file,
+    process_urls_batch,
+    process_directories_batch
+)
+from .batch_config import create_simple_batch_config
 
 
 def setup_parser() -> argparse.ArgumentParser:
@@ -34,27 +41,28 @@ Examples:
   # Process with RAG-optimized settings
   uloader document.pdf -o output.json --preset rag
   
-  # Save as JSON format instead of documents
-  uloader document.pdf -o output.json --format json
-  
   # Process directory with custom chunk size
   uloader docs/ -o results.json --chunk-size 800
   
-  # Load URL content
-  uloader https://example.com/article -o article.json
+  # Batch process multiple URLs from file
+  uloader dummy -o output_dir/ --urls-file urls.txt
+  
+  # Batch process multiple sources from file
+  uloader dummy -o output_dir/ --sources-file sources.txt
+  
+  # Process with comprehensive batch configuration
+  uloader dummy -o output_dir/ --batch-config batch_config.json
   
   # Use custom configuration file
   uloader document.pdf -o output.json --config my_config.json
-  
-  # Process with OCR for multiple languages
-  uloader document.pdf -o output.json --ocr-lang eng,fra,deu
 """
     )
     
     # Input source
     parser.add_argument(
         "input",
-        help="Input file, directory, or URL to process"
+        nargs="?",
+        help="Input file, directory, or URL to process (not needed for batch processing)"
     )
     
     # Output options
@@ -81,6 +89,22 @@ Examples:
     parser.add_argument(
         "--config",
         help="Path to custom configuration JSON file"
+    )
+    
+    # Batch processing
+    parser.add_argument(
+        "--batch-config",
+        help="Path to batch configuration file for processing multiple sources"
+    )
+    
+    parser.add_argument(
+        "--urls-file",
+        help="Path to text file containing URLs (one per line) for batch processing"
+    )
+    
+    parser.add_argument(
+        "--sources-file", 
+        help="Path to text file containing file/directory paths (one per line) for batch processing"
     )
     
     # Processing options
@@ -300,35 +324,126 @@ def show_statistics(data, verbose: bool = False):
                 print(f"Average words per element: {total_words / len(data):.1f}")
 
 
+def process_batch_inputs(args) -> Dict[str, Any]:
+    """Process batch inputs from configuration files"""
+    
+    if args.batch_config:
+        # Process from comprehensive batch configuration
+        if args.verbose:
+            print(f"📋 Processing batch from config: {args.batch_config}")
+        return process_batch_from_config_file(args.batch_config)
+    
+    elif args.urls_file:
+        # Process URLs from file
+        if args.verbose:
+            print(f"🌐 Processing URLs from: {args.urls_file}")
+        
+        urls = []
+        with open(args.urls_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                url = line.strip()
+                if url and not url.startswith('#'):  # Skip empty lines and comments
+                    urls.append(url)
+        
+        if not urls:
+            raise ValueError(f"No valid URLs found in {args.urls_file}")
+        
+        return process_urls_batch(
+            urls=urls,
+            output_dir=args.output,
+            max_workers=3,
+            verbose=args.verbose
+        )
+    
+    elif args.sources_file:
+        # Process sources from file
+        if args.verbose:
+            print(f"📁 Processing sources from: {args.sources_file}")
+        
+        sources = []
+        with open(args.sources_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                source = line.strip()
+                if source and not source.startswith('#'):  # Skip empty lines and comments
+                    sources.append(source)
+        
+        if not sources:
+            raise ValueError(f"No valid sources found in {args.sources_file}")
+        
+        # Create simple batch config and process
+        config = create_simple_batch_config(sources, args.output)
+        config.verbose = args.verbose
+        config.max_workers = 2
+        
+        processor = BatchProcessor(config)
+        return processor.process_all()
+    
+    else:
+        raise ValueError("No batch processing option specified")
+
+
 def main():
     """Main CLI entry point"""
     parser = setup_parser()
     args = parser.parse_args()
     
     try:
-        # Create configuration
-        if args.verbose:
-            print("Creating configuration...")
-        config = create_config_from_args(args)
+        # Check for batch processing
+        is_batch = args.batch_config or args.urls_file or args.sources_file
         
-        # Initialize loader
-        loader = UniversalDataLoader(config)
-        
-        # Process input
-        if args.verbose:
-            print(f"Processing input: {args.input}")
-        result = process_input(loader, args.input, args)
-        
-        # Save output
-        if args.verbose:
-            print(f"Saving output to: {args.output}")
-        loader.save_output(result, args.output)
-        
-        # Show statistics if requested
-        if args.stats or args.verbose:
-            show_statistics(result, verbose=args.verbose)
-        
-        print(f"✓ Successfully processed and saved to {args.output}")
+        if is_batch:
+            # Batch processing mode
+            summary = process_batch_inputs(args)
+            
+            # Show summary
+            print(f"\n📊 Batch Processing Summary:")
+            print(f"  Batch ID: {summary['batch_id']}")
+            print(f"  Sources processed: {summary['successful_sources']}/{summary['total_sources']}")
+            print(f"  Total documents: {summary['total_documents']:,}")
+            print(f"  Total words: {summary['total_words']:,}")
+            
+            if summary['failed_sources'] > 0:
+                print(f"  ⚠️ Failed sources: {summary['failed_sources']}")
+                if args.verbose:
+                    for source, error in summary['errors'].items():
+                        print(f"    {source}: {error}")
+            
+            print(f"\n📁 Output files:")
+            for source, output_file in summary['output_files'].items():
+                print(f"  {source}: {output_file}")
+            
+            print(f"\n✅ Batch processing completed!")
+            
+        else:
+            # Single source processing mode
+            if not args.input:
+                print("❌ Error: Input source is required for single processing mode")
+                print("Use --batch-config, --urls-file, or --sources-file for batch processing")
+                sys.exit(1)
+            
+            # Create configuration
+            if args.verbose:
+                print("Creating configuration...")
+            config = create_config_from_args(args)
+            
+            # Initialize loader
+            loader = UniversalDataLoader(config)
+            
+            # Process input
+            if args.verbose:
+                print(f"Processing input: {args.input}")
+            result = process_input(loader, args.input, args)
+            
+            # Save output
+            if args.verbose:
+                print(f"Saving output to: {args.output}")
+            loader.save_output(result, args.output)
+            
+            # Show statistics if requested
+            if args.stats or args.verbose:
+                show_statistics(result, verbose=args.verbose)
+            
+            print(f"✓ Successfully processed and saved to {args.output}")
         
     except KeyboardInterrupt:
         print("\n❌ Processing interrupted by user")

@@ -1,436 +1,288 @@
-# Universal Data Loader for LLMs
+# Universal Document Loader 📄➡️🤖
 
-A Python library that provides a universal interface for loading and processing various document types using the Unstructured library. Designed specifically for LLM applications including RAG systems, model training, and document analysis.
+**Turn any document into AI-ready data in seconds**
 
-## Features
+## What does this tool do?
 
-- **LangChain Compatible**: Native support for LangChain Document format - plug and play with any LLM framework
-- **Multi-format Support**: Process PDF, DOCX, HTML, TXT, CSV, XLSX, PPTX, EML, and more
-- **Flexible Configuration**: Customizable processing options for different use cases
-- **Chunking Strategies**: Multiple chunking approaches for optimal text segmentation
-- **OCR Support**: Multi-language OCR capabilities for image-based documents
-- **RAG-Optimized**: Pre-configured settings for Retrieval-Augmented Generation
-- **Batch Processing**: Process entire directories of documents
-- **URL Support**: Load and process content directly from URLs
-- **Rich Metadata**: Preserve and enhance document metadata for better retrieval
+This tool takes your documents (PDFs, Word files, websites, etc.) and converts them into a format that AI systems can understand and use. Think of it as a universal translator between human documents and AI applications.
 
-## Installation
+## Why do you need this?
 
-1. Clone this repository:
+**The Problem:** AI chatbots and search systems can't directly read your PDF reports, Word documents, or web pages. They need the content broken down into smaller, structured pieces.
+
+**The Solution:** This tool automatically:
+- ✅ Reads your documents (PDFs, Word, PowerPoint, websites, etc.)
+- ✅ Extracts the text content
+- ✅ Breaks it into AI-friendly chunks
+- ✅ Saves it in a format ready for AI applications
+
+**Perfect for:**
+- Building company chatbots with your documents
+- Creating AI-powered search systems
+- Training AI models on your data
+- Analyzing large collections of documents
+
+---
+
+## 🚀 Quick Start (3 Simple Steps)
+
+### Step 1: Setup (One-time only)
 ```bash
+# Download the tool
 git clone <repository-url>
 cd unstructured
-```
 
-2. Create and activate a virtual environment:
-```bash
+# Set it up (takes 2-3 minutes)
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\\Scripts\\activate
-```
-
-3. Install dependencies:
-```bash
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Quick Start
-
-### Command Line Interface
-
-The easiest way to use the Universal Data Loader is through the command line:
-
+### Step 2: Convert Your First Document
 ```bash
-# Basic usage - load a PDF and save as LangChain Documents (default)
-python uloader.py document.pdf -o output.json
+# Convert a PDF to AI-ready format
+python uloader.py your-document.pdf -o ai-ready-data.json
 
-# With RAG-optimized settings  
-python uloader.py document.pdf -o output.json --preset rag
-
-# Process with custom chunk size and show statistics
-python uloader.py document.pdf -o output.json --chunk-size 800 --stats
-
-# Process entire directory
-python uloader.py documents/ -o results.json --recursive
-
-# Load from URL
-python uloader.py https://example.com/article -o article.json
-
-# Save in different formats
-python uloader.py document.pdf -o output.json --format documents  # LangChain Documents (default)
-python uloader.py document.pdf -o output.json --format json       # Raw JSON
-python uloader.py document.pdf -o output.txt --format text        # Plain text
+# That's it! Your document is now ready for AI applications
 ```
 
-### Python API
+### Step 3: Check Your Results
+Your file `ai-ready-data.json` now contains your document in AI-ready format with:
+- Text content broken into smart chunks
+- Important information like page numbers, document source
+- Everything organized for AI systems to use
 
-```python
-from universal_loader import UniversalDataLoader, LoaderConfig, Document, DocumentCollection
+---
 
-# Basic usage - returns LangChain-compatible Documents by default
-loader = UniversalDataLoader()
-documents = loader.load_file("document.pdf")  # Returns DocumentCollection
+## 📋 Common Tasks
 
-# Use documents directly in LangChain
-for doc in documents:
-    print(f"Content: {doc.page_content}")
-    print(f"Metadata: {doc.metadata}")
+### Process Different File Types
+```bash
+# PDF documents
+python uloader.py report.pdf -o output.json
 
-# Convert to list for LangChain functions
-docs_list = documents.to_list()  # List[Document]
+# Word documents  
+python uloader.py presentation.docx -o output.json
 
-# Get statistics
-stats = documents.get_statistics()
-print(f"Loaded {stats['document_count']} documents")
+# Web pages
+python uloader.py https://your-company.com/policies -o output.json
 
-# Save processed output
-loader.save_output(documents, "output.json")
+# Text files
+python uloader.py notes.txt -o output.json
 ```
 
-## Configuration Options
+### Process Multiple Documents at Once
 
-### Pre-configured Settings
-
-```python
-from universal_loader.utils import create_config_for_rag, create_config_for_training
-
-# RAG-optimized configuration
-rag_config = create_config_for_rag()
-loader = UniversalDataLoader(rag_config)
-
-# Training-optimized configuration  
-training_config = create_config_for_training()
-loader = UniversalDataLoader(training_config)
+**Option 1: Process a whole folder**
+```bash
+# Convert all documents in a folder
+python uloader.py my-documents/ -o all-documents.json --recursive
 ```
 
-### Custom Configuration
-
-```python
-from universal_loader.config import LoaderConfig, OutputFormat, ChunkingStrategy
-
-config = LoaderConfig(
-    output_format=OutputFormat.JSON,
-    chunking_strategy=ChunkingStrategy.BY_TITLE,
-    max_chunk_size=1000,
-    chunk_overlap=100,
-    ocr_languages=["eng", "fra"],
-    extract_images=True,
-    min_text_length=50,
-    remove_headers_footers=True
-)
-
-loader = UniversalDataLoader(config)
+**Option 2: Process a list of websites**
+1. Create a text file called `websites.txt` with your URLs:
+```
+https://your-company.com/about
+https://your-company.com/services  
+https://your-company.com/policies
 ```
 
-## Usage Examples
-
-### Single File Processing
-
-```python
-# Load a PDF document
-documents = loader.load_file("research_paper.pdf")
-
-# Load a Word document with custom settings
-config = LoaderConfig(chunking_strategy=ChunkingStrategy.BASIC, max_chunk_size=500)
-loader = UniversalDataLoader(config)
-documents = loader.load_file("report.docx")
+2. Process all websites at once:
+```bash
+python uloader.py dummy -o website-data/ --urls-file websites.txt
 ```
 
-### Directory Processing
-
-The Universal Data Loader excels at processing entire directories with mixed file types:
-
-```python
-# Process all supported files in a directory
-documents = loader.load_directory("documents/", recursive=True)
-
-# The result is a DocumentCollection with all files processed
-print(f"Processed {len(documents)} documents from directory")
-
-# Filter by source file type
-pdf_docs = []
-for doc in documents:
-    if doc.get_metadata('source_file', '').endswith('.pdf'):
-        pdf_docs.append(doc)
-
-# Filter by element type
-title_docs = documents.filter_by_metadata('element_type', 'Title')
-
-# Get collection statistics
-stats = documents.get_statistics()
-print(f"Total words: {stats['total_words']}")
+**Option 3: Process mixed sources (files, folders, websites)**
+1. Create a text file called `sources.txt`:
+```
+documents/policies/
+reports/annual-report.pdf
+https://company.com/handbook
 ```
 
-**Supported File Types in Directories:**
-- PDFs, Word docs, PowerPoint, Excel
-- HTML, Markdown, Text files  
-- CSV files, Email files (EML/MSG)
-- JSON, XML, RTF files
-- Automatically detects and processes each type appropriately
-
-### URL Processing
-
-```python
-# Load content from a web page
-elements = loader.load_url("https://example.com/article")
+2. Process everything together:
+```bash
+python uloader.py dummy -o company-data/ --sources-file sources.txt
 ```
 
-### Output Formats
-
-```python
-# JSON output (default)
-config = LoaderConfig(output_format=OutputFormat.JSON)
-
-# Plain text output
-config = LoaderConfig(output_format=OutputFormat.TEXT)
-
-# Raw elements
-config = LoaderConfig(output_format=OutputFormat.ELEMENTS)
-```
-
-## Configuration Management
-
-### Save and Load Configurations
-
-```python
-from universal_loader.utils import save_config_to_file, load_config_from_file
-
-# Save configuration
-save_config_to_file(config, "my_config.json")
-
-# Load configuration
-config = load_config_from_file("my_config.json")
-```
-
-### Configuration Presets
-
-| Preset | Use Case | Key Features |
-|--------|----------|--------------|
-| `create_default_config()` | General purpose | Balanced settings for most documents |
-| `create_config_for_rag()` | RAG systems | Optimized chunking for retrieval |
-| `create_config_for_training()` | Model training | Clean text output, larger chunks |
-
-## Supported File Types
-
-| Format | Extensions | Features |
-|--------|------------|----------|
-| PDF | `.pdf` | OCR, table extraction, image extraction |
-| Word | `.docx`, `.doc` | Full formatting preservation |
-| PowerPoint | `.pptx`, `.ppt` | Slide content extraction |
-| Excel | `.xlsx`, `.xls` | Sheet and cell processing |
-| Web | `.html`, `.htm` | HTML parsing and cleaning |
-| Text | `.txt`, `.md` | Plain text processing |
-| Email | `.eml`, `.msg` | Email content and metadata |
-| CSV | `.csv` | Structured data processing |
-
-## Advanced Features
-
-### OCR Configuration
-
-```python
-config = LoaderConfig(
-    ocr_languages=["eng", "fra", "deu"],  # Multiple languages
-    extract_images=True,
-    custom_partition_kwargs={
-        "strategy": "hi_res",  # High resolution for better OCR
-        "infer_table_structure": True
+### Advanced Batch Processing
+For complex projects, create a configuration file `batch-config.json`:
+```json
+{
+  "sources": [
+    {
+      "type": "directory",
+      "path": "company-policies/",
+      "output_prefix": "policies"
+    },
+    {
+      "type": "url", 
+      "path": "https://company.com/handbook",
+      "output_prefix": "handbook"
+    },
+    {
+      "type": "file",
+      "path": "important-document.pdf",
+      "output_prefix": "important"
     }
-)
+  ],
+  "output": {
+    "base_path": "company-knowledge-base",
+    "separate_by_source": true,
+    "merge_all": true
+  },
+  "max_workers": 3,
+  "verbose": true
+}
 ```
 
-### Custom Processing
+Then run:
+```bash
+python uloader.py dummy -o output/ --batch-config batch-config.json
+```
 
-```python
-config = LoaderConfig(
-    custom_partition_kwargs={
-        "strategy": "hi_res",
-        "infer_table_structure": True,
-        "include_page_breaks": True,
-        "skip_infer_table_types": False
+---
+
+## 🎯 What You Get
+
+After processing, your documents become structured data that looks like this:
+
+```json
+[
+  {
+    "page_content": "Our company policy states that...",
+    "metadata": {
+      "filename": "company-policy.pdf",
+      "page_number": 1,
+      "element_type": "text"
     }
-)
+  },
+  {
+    "page_content": "The next section covers...",
+    "metadata": {
+      "filename": "company-policy.pdf", 
+      "page_number": 2,
+      "element_type": "text"
+    }
+  }
+]
 ```
 
-### Filtering and Utilities
+This format is perfect for:
+- ✅ AI chatbots that answer questions about your documents
+- ✅ Smart search systems
+- ✅ Document analysis tools
+- ✅ Any AI application that needs to understand your content
 
-```python
-from universal_loader.utils import (
-    filter_elements_by_type,
-    extract_text_only,
-    count_elements_by_type
-)
+---
 
-# Filter by element type
-text_elements = filter_elements_by_type(elements, ["NarrativeText", "Title"])
+## 🛠️ Customization Options
 
-# Extract just the text
-texts = extract_text_only(elements)
-
-# Get statistics
-stats = count_elements_by_type(elements)
-```
-
-## Command Line Interface
-
-### Installation for CLI
-
-To use the CLI globally, you can install the package:
-
+### Control Text Chunk Size
 ```bash
-# Install in development mode
-pip install -e .
+# Smaller chunks (better for precise search)
+python uloader.py document.pdf -o output.json --chunk-size 400
 
-# Now you can use 'uloader' command anywhere
-uloader document.pdf -o output.json
+# Larger chunks (better for context)
+python uloader.py document.pdf -o output.json --chunk-size 1200
 ```
 
-### CLI Examples
-
+### Choose Output Format
 ```bash
-# Basic document processing
-uloader document.pdf -o output.json
+# AI-ready format (default - recommended)
+python uloader.py document.pdf -o output.json --format documents
 
-# RAG-optimized processing with statistics
-uloader research_paper.pdf -o chunks.json --preset rag --stats
+# Plain text only
+python uloader.py document.pdf -o output.txt --format text
 
-# Process with custom settings
-uloader document.docx -o output.json \
-  --chunk-strategy by_title \
-  --chunk-size 1000 \
-  --chunk-overlap 150 \
-  --ocr-lang eng,fra
-
-# Process entire directory
-uloader documents/ -o all_docs.json --recursive --verbose
-
-# Extract text only (no metadata)
-uloader document.pdf -o text_only.json --format text --no-metadata
-
-# Process URL content
-uloader https://en.wikipedia.org/wiki/Artificial_intelligence -o ai_article.json
-
-# Use custom configuration file
-uloader document.pdf -o output.json --config my_config.json
-
-# Fast processing for large files
-uloader large_document.pdf -o output.json --preset training --no-metadata
+# Raw data (for technical users)
+python uloader.py document.pdf -o output.json --format json
 ```
 
-### CLI Options
-
-| Option | Description | Example |
-|--------|-------------|---------|
-| `--preset` | Use predefined configuration | `--preset rag` |
-| `--format` | Output format (documents/json/text/elements) | `--format documents` |
-| `--chunk-strategy` | Chunking method | `--chunk-strategy by_title` |
-| `--chunk-size` | Maximum chunk size | `--chunk-size 800` |
-| `--chunk-overlap` | Overlap between chunks | `--chunk-overlap 100` |
-| `--ocr-lang` | OCR languages | `--ocr-lang eng,fra,deu` |
-| `--extract-images` | Extract images from docs | `--extract-images` |
-| `--stats` | Show processing statistics | `--stats` |
-| `--verbose` | Detailed output | `--verbose` |
-
-## LangChain Integration
-
-The Universal Data Loader is designed for seamless integration with LangChain and other LLM frameworks:
-
-### Direct LangChain Compatibility
-
-```python
-from universal_loader import UniversalDataLoader
-from langchain_chroma import Chroma
-from langchain_openai import OpenAIEmbeddings
-
-# Load documents - returns LangChain-compatible Documents
-loader = UniversalDataLoader()
-documents = loader.load_file("research_paper.pdf")
-
-# Use directly with LangChain vector stores
-embeddings = OpenAIEmbeddings()
-vectorstore = Chroma.from_documents(
-    documents=documents.to_list(),  # Convert to List[Document]
-    embedding=embeddings
-)
-
-# Ready for RAG applications
-retriever = vectorstore.as_retriever()
-```
-
-### Enhanced Metadata for Better Retrieval
-
-```python
-# Documents include rich metadata for enhanced retrieval
-for doc in documents:
-    print(f"Content: {doc.page_content}")
-    print(f"Source: {doc.metadata['filename']}")
-    print(f"Page: {doc.metadata.get('page_number', 'N/A')}")
-    print(f"Element Type: {doc.metadata['element_type']}")
-```
-
-### Collection Operations
-
-```python
-# Filter documents by metadata
-technical_docs = documents.filter_by_metadata("element_type", "NarrativeText")
-
-# Filter by content length  
-long_docs = documents.filter_by_content_length(min_length=100)
-
-# Get collection statistics
-stats = documents.get_statistics()
-print(f"Total documents: {stats['document_count']}")
-print(f"Average length: {stats['average_characters']} chars")
-```
-
-## Python API Examples
-
-Run the example scripts to see the library in action:
-
+### Get Processing Information
 ```bash
-# Basic usage examples
-python examples/basic_usage.py
-
-# Configuration examples
-python examples/config_examples.py
-
-# LangChain integration examples
-python examples/langchain_integration.py
-
-# Directory processing examples
-python examples/directory_processing.py
+# See what happened during processing
+python uloader.py document.pdf -o output.json --verbose --stats
 ```
 
-## Contributing
+---
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/new-feature`)
-3. Commit your changes (`git commit -am 'Add new feature'`)
-4. Push to the branch (`git push origin feature/new-feature`)
-5. Create a Pull Request
+## 📁 File Types Supported
 
-## License
+| Document Type | File Extensions | What It Extracts |
+|---------------|----------------|------------------|
+| **PDF Documents** | `.pdf` | Text, tables, images (with OCR if needed) |
+| **Word Documents** | `.docx`, `.doc` | All text content and formatting |
+| **PowerPoint** | `.pptx`, `.ppt` | Slide content and speaker notes |
+| **Excel Spreadsheets** | `.xlsx`, `.xls` | Cell content and data |
+| **Web Pages** | `http://`, `https://` | Page content (cleaned) |
+| **Text Files** | `.txt`, `.md` | All text content |
+| **Email Files** | `.eml`, `.msg` | Email content and attachments |
+| **CSV Data** | `.csv` | Structured data |
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+---
 
-## Dependencies
+## ❓ Troubleshooting
 
-- `unstructured[all-docs]>=0.17.0` - Core document processing
-- `python-magic` - File type detection
-- `pydantic>=2.0.0` - Configuration validation
-- `pathlib` - Path handling
-- `typing-extensions` - Type hints
+### "Command not found" Error
+Make sure you activated the virtual environment:
+```bash
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
-## Troubleshooting
+### "File not found" Error
+- Check the file path is correct
+- Use quotes around file names with spaces: `"my document.pdf"`
 
-### Common Issues
+### Processing Takes Too Long
+- For large files, add `--chunk-size 2000` to speed up processing
+- For many files, the tool processes them in parallel automatically
 
-1. **OCR not working**: Ensure tesseract is installed on your system
-2. **PDF processing slow**: Try using `strategy="fast"` in custom_partition_kwargs
-3. **Memory issues**: Reduce `max_chunk_size` or process files individually
-4. **File type not supported**: Check the SUPPORTED_EXTENSIONS set in the loader
+### PDF Not Reading Properly
+- If PDF contains scanned images, the tool automatically uses OCR (text recognition)
+- For better results with scanned documents, ensure good image quality
 
-### Performance Tips
+### Need Help?
+- Run `python uloader.py --help` to see all options
+- Check that your file type is in the supported list above
+- Make sure the file isn't corrupted by opening it manually first
 
-- Use `strategy="fast"` for quicker processing of large documents
-- Set `include_metadata=False` if metadata is not needed
-- Adjust chunk sizes based on your downstream application requirements
-- Process files in batches rather than all at once for large directories
+---
+
+## 💡 Real-World Examples
+
+### Building a Company Chatbot
+```bash
+# Step 1: Process all company documents
+python uloader.py company-docs/ -o chatbot-data.json --recursive
+
+# Step 2: Use the output file with your AI chatbot platform
+# The chatbot can now answer questions about your company documents!
+```
+
+### Creating a Searchable Knowledge Base
+```bash
+# Process documentation from multiple sources
+python uloader.py dummy -o knowledge-base/ --sources-file all-sources.txt
+
+# Result: Searchable database of all your important information
+```
+
+### Analyzing Customer Feedback
+```bash
+# Process all feedback files
+python uloader.py feedback-forms/ -o analysis-ready.json --chunk-size 200
+
+# Result: Structured data ready for AI analysis
+```
+
+---
+
+## 🚀 Next Steps
+
+1. **Start Simple**: Try converting one document first
+2. **Scale Up**: Process folders or use batch processing for multiple sources
+3. **Integrate**: Use the output files with your AI applications
+4. **Customize**: Adjust settings based on your specific needs
+
+**Questions?** The tool is designed to work out-of-the-box for most use cases. Start with the basic commands and expand as needed!

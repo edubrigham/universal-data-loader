@@ -47,9 +47,9 @@ def save_config_to_file(config: LoaderConfig, config_path: Union[str, Path]) -> 
 def create_default_config() -> LoaderConfig:
     """Create a default configuration for common use cases"""
     return LoaderConfig(
-        output_format=OutputFormat.JSON,
+        output_format=OutputFormat.DOCUMENTS,
         include_metadata=True,
-        chunking_strategy=ChunkingStrategy.BY_TITLE,
+        chunking_strategy=None,  # No chunking by default - preserve context
         max_chunk_size=1000,
         chunk_overlap=100,
         ocr_languages=["eng"],
@@ -62,9 +62,9 @@ def create_default_config() -> LoaderConfig:
 def create_config_for_rag() -> LoaderConfig:
     """Create a configuration optimized for RAG applications"""
     return LoaderConfig(
-        output_format=OutputFormat.JSON,
+        output_format=OutputFormat.DOCUMENTS,
         include_metadata=True,
-        chunking_strategy=ChunkingStrategy.BY_TITLE,
+        chunking_strategy=ChunkingStrategy.BY_TITLE,  # Chunking enabled for RAG
         max_chunk_size=800,  # Smaller chunks for better retrieval
         chunk_overlap=150,   # More overlap for context preservation
         ocr_languages=["eng"],

@@ -148,6 +148,118 @@ class UniversalDataLoader:
             elements = self._apply_chunking(elements)
             
         return self._format_output(elements)
+
+    def _create_combined_documents(self, elements) -> DocumentCollection:
+        """
+        Create combined documents without aggressive chunking.
+        Groups elements intelligently to preserve context.
+        """
+        documents = DocumentCollection()
+        
+        # Group elements by source (page, section, or document)
+        grouped_elements = self._group_elements_by_source(elements)
+        
+        for group_key, group_elements in grouped_elements.items():
+            # Combine all text from elements in this group
+            combined_text = []
+            combined_metadata = {}
+            element_types = set()
+            
+            for element in group_elements:
+                text = str(element).strip()
+                if text and len(text) >= self.config.min_text_length:
+                    combined_text.append(text)
+                    
+                    # Collect metadata from first element or common metadata
+                    if not combined_metadata and self.config.include_metadata:
+                        if hasattr(element, 'metadata') and element.metadata:
+                            if hasattr(element.metadata, 'to_dict'):
+                                combined_metadata.update(element.metadata.to_dict())
+                            elif isinstance(element.metadata, dict):
+                                combined_metadata.update(element.metadata)
+                    
+                    # Track element types
+                    if hasattr(element, 'category'):
+                        element_types.add(element.category)
+            
+            # Create combined document if we have content
+            if combined_text:
+                page_content = '\n\n'.join(combined_text)
+                
+                # Add summary metadata
+                if self.config.include_metadata:
+                    combined_metadata['element_types'] = list(element_types)
+                    combined_metadata['combined_elements_count'] = len(combined_text)
+                    if not combined_metadata.get('element_type'):
+                        combined_metadata['element_type'] = 'Combined'
+                
+                doc = Document(page_content=page_content, metadata=combined_metadata)
+                documents.add_document(doc)
+        
+        return documents
+
+    def _group_elements_by_source(self, elements):
+        """Group elements by source (page, file, or logical section)"""
+        groups = {}
+        
+        for element in elements:
+            # Try to group by page number first
+            group_key = 'page_1'  # default
+            
+            if hasattr(element, 'metadata') and element.metadata:
+                metadata = element.metadata
+                if hasattr(metadata, 'to_dict'):
+                    meta_dict = metadata.to_dict()
+                elif isinstance(metadata, dict):
+                    meta_dict = metadata
+                else:
+                    meta_dict = {}
+                
+                # Group by page number if available
+                page_num = meta_dict.get('page_number', meta_dict.get('page', 1))
+                group_key = f'page_{page_num}'
+                
+                # For web content, group by URL or document
+                if 'url' in meta_dict:
+                    group_key = f"url_{meta_dict['url']}"
+                elif 'filename' in meta_dict:
+                    group_key = f"file_{meta_dict['filename']}"
+            
+            if group_key not in groups:
+                groups[group_key] = []
+            groups[group_key].append(element)
+        
+        return groups
+
+    def _create_chunked_documents(self, elements) -> DocumentCollection:
+        """
+        Create documents with chunking strategy applied.
+        This preserves the original behavior when chunking is explicitly requested.
+        """
+        documents = DocumentCollection()
+        
+        # For chunked documents, use original element-per-document approach
+        for element in elements:
+            text_content = str(element)
+            if len(text_content) < self.config.min_text_length:
+                continue
+                
+            metadata = {}
+            if self.config.include_metadata:
+                if hasattr(element, 'category'):
+                    metadata['element_type'] = element.category
+                if hasattr(element, 'metadata') and element.metadata:
+                    if hasattr(element.metadata, 'to_dict'):
+                        metadata.update(element.metadata.to_dict())
+                    elif isinstance(element.metadata, dict):
+                        metadata.update(element.metadata)
+                if hasattr(element, 'id'):
+                    metadata['element_id'] = element.id
+            
+            doc = Document(page_content=text_content, metadata=metadata)
+            documents.add_document(doc)
+        
+        return documents
         
     def _partition_file(self, file_path: Path):
         """Partition a file based on its type"""
@@ -244,32 +356,13 @@ class UniversalDataLoader:
             # Convert elements to LangChain-compatible Documents
             documents = DocumentCollection()
             
-            for element in elements:
-                # Extract text content
-                text_content = str(element)
-                
-                # Create metadata
-                metadata = {}
-                if self.config.include_metadata:
-                    # Add element-specific metadata
-                    if hasattr(element, 'category'):
-                        metadata['element_type'] = element.category
-                    if hasattr(element, 'metadata') and element.metadata:
-                        # Convert unstructured metadata to dict if needed
-                        if hasattr(element.metadata, 'to_dict'):
-                            metadata.update(element.metadata.to_dict())
-                        elif isinstance(element.metadata, dict):
-                            metadata.update(element.metadata)
-                    
-                    # Add element ID if available
-                    if hasattr(element, 'id'):
-                        metadata['element_id'] = element.id
-                
-                # Create Document
-                doc = Document(page_content=text_content, metadata=metadata)
-                documents.add_document(doc)
-            
-            return documents
+            # Check if chunking is enabled
+            if self.config.chunking_strategy:
+                # Chunking enabled - use chunking strategy
+                return self._create_chunked_documents(elements)
+            else:
+                # No chunking - combine elements intelligently
+                return self._create_combined_documents(elements)
             
         elif self.config.output_format == OutputFormat.TEXT:
             text_elements = []
