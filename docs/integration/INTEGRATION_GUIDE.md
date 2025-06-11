@@ -254,6 +254,7 @@ curl -X POST "http://localhost:8000/process/batch" \
   -d '{
     "sources": [
       {"type": "url", "path": "https://docs.company.com"},
+      {"type": "url_list", "path": "/data/urls.txt"},
       {"type": "file", "path": "/data/manual.pdf"},
       {"type": "directory", "path": "/data/policies/"}
     ],
@@ -311,7 +312,7 @@ All endpoints return LangChain-compatible documents:
 {
   "sources": [
     {
-      "type": "file",                   // "file" | "directory" | "url"
+      "type": "file",                   // "file" | "directory" | "url" | "url_list"
       "path": "/data/document.pdf",
       "output_prefix": "company_docs",
       "custom_config": {                // Override global config per source
@@ -319,6 +320,11 @@ All endpoints return LangChain-compatible documents:
         "chunking_strategy": "basic",
         "max_chunk_size": 1000
       }
+    },
+    {
+      "type": "url_list",               // Process multiple URLs from text file
+      "path": "/data/websites.txt",     // File with one URL per line
+      "output_prefix": "web_content"
     }
   ],
   "output_config": {
@@ -378,6 +384,7 @@ class RAGDataLoader:
 rag_loader = RAGDataLoader()
 retriever = rag_loader.setup_knowledge_base([
     {"type": "url", "path": "https://docs.company.com"},
+    {"type": "url_list", "path": "/data/company_urls.txt"},
     {"type": "directory", "path": "/data/policies/"},
     {"type": "file", "path": "/data/handbook.pdf"}
 ])
