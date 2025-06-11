@@ -166,9 +166,7 @@ Content-Type: application/json
 {
   "source": "https://example.com/document.pdf",
   "source_type": "url",
-  "output_format": "documents",
-  "chunking_strategy": "auto",
-  "max_chunk_size": 1000
+  "output_format": "documents"
 }
 ```
 
@@ -204,6 +202,34 @@ Response:
 GET /jobs/{job_id}/results
 ```
 
+### Optional: Document Chunking
+
+By default, documents are returned as complete units to leverage modern LLMs' large context windows. Chunking is available when needed:
+
+```bash
+POST /process/documents
+Content-Type: application/json
+
+{
+  "source": "https://example.com/document.pdf",
+  "source_type": "url",
+  "output_format": "documents",
+  "enable_chunking": true,
+  "chunking_strategy": "auto",
+  "max_chunk_size": 1000,
+  "chunk_overlap": 100
+}
+```
+
+**Chunking Control:**
+- `enable_chunking: false` (default) - Returns complete documents
+- `enable_chunking: true` - Requires `chunking_strategy` and `max_chunk_size`
+
+**When to use chunking:**
+- Working with older LLMs with limited context windows
+- Building vector databases that require smaller segments
+- Processing extremely large documents that exceed context limits
+
 ---
 
 ## ⚙️ Configuration
@@ -218,8 +244,8 @@ DEBUG=false
 ENVIRONMENT=production
 
 # Optional: Configure document processing
-MAX_CHUNK_SIZE=1000
 DEFAULT_OUTPUT_FORMAT=documents
+ENABLE_CHUNKING=false
 ```
 
 ### Docker Compose Configuration
@@ -299,7 +325,6 @@ def custom_document_pipeline(sources):
         "sources": sources,
         "processing": {
             "output_format": "documents",
-            "max_chunk_size": 500,
             "include_metadata": True
         }
     })

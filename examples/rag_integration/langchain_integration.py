@@ -151,23 +151,20 @@ def example_document_processing_pipeline():
     sample_file.write_text(complex_content)
     
     try:
-        # Configure for document processing
+        # Configure for document processing - no chunking by default
         config = LoaderConfig(
             output_format=OutputFormat.DOCUMENTS,
-            chunking_strategy="by_title",
-            max_chunk_size=300,
-            chunk_overlap=50,
             include_metadata=True
         )
         
         loader = UniversalDataLoader(config)
         documents = loader.load_file(sample_file)
         
-        print(f"📝 Processed document into {len(documents)} chunks")
+        print(f"📝 Processed document into {len(documents)} complete documents")
         
         # Show document processing results
         for i, doc in enumerate(documents):
-            print(f"\nChunk {i+1}:")
+            print(f"\nDocument {i+1}:")
             print(f"  Length: {len(doc.page_content)} characters")
             print(f"  Content: {doc.page_content}")
             if doc.metadata:

@@ -21,15 +21,23 @@ class DocumentProcessingService:
         config_dict = {
             "output_format": OutputFormat(config_data.get("output_format", "documents")),
             "include_metadata": config_data.get("include_metadata", True),
-            "max_chunk_size": config_data.get("max_chunk_size", 1000),
-            "chunk_overlap": config_data.get("chunk_overlap", 100),
             "min_text_length": config_data.get("min_text_length", 10),
             "remove_headers_footers": config_data.get("remove_headers_footers", True),
             "ocr_languages": config_data.get("ocr_languages", ["eng"])
         }
         
-        if config_data.get("chunking_strategy"):
+        # Only add chunking parameters if enable_chunking=True
+        if config_data.get("enable_chunking", False):
+            if not config_data.get("chunking_strategy"):
+                raise ValueError("chunking_strategy is required when enable_chunking=True")
+            if not config_data.get("max_chunk_size"):
+                raise ValueError("max_chunk_size is required when enable_chunking=True")
+                
             config_dict["chunking_strategy"] = ChunkingStrategy(config_data["chunking_strategy"])
+            config_dict["max_chunk_size"] = config_data["max_chunk_size"]
+            
+            if config_data.get("chunk_overlap") is not None:
+                config_dict["chunk_overlap"] = config_data["chunk_overlap"]
         
         return LoaderConfig(**config_dict)
     
@@ -116,18 +124,28 @@ class DocumentProcessingService:
                     
                     print(f"🔧 DEBUG: Processing {source_type}: {source_path}")
                     
-                    # Create a fresh loader for each source to avoid batch processing
-                    loader_config = LoaderConfig(
-                        output_format=OutputFormat(loader_config_data.get("output_format", "documents")),
-                        include_metadata=loader_config_data.get("include_metadata", True),
-                        max_chunk_size=loader_config_data.get("max_chunk_size", 1000),
-                        chunk_overlap=loader_config_data.get("chunk_overlap", 100),
-                        min_text_length=loader_config_data.get("min_text_length", 10),
-                        remove_headers_footers=loader_config_data.get("remove_headers_footers", True)
-                    )
+                    # Create a fresh loader for each source - use enable_chunking flag
+                    loader_config_dict = {
+                        "output_format": OutputFormat(loader_config_data.get("output_format", "documents")),
+                        "include_metadata": loader_config_data.get("include_metadata", True),
+                        "min_text_length": loader_config_data.get("min_text_length", 10),
+                        "remove_headers_footers": loader_config_data.get("remove_headers_footers", True)
+                    }
                     
-                    if loader_config_data.get("chunking_strategy"):
-                        loader_config.chunking_strategy = ChunkingStrategy(loader_config_data["chunking_strategy"])
+                    # Only add chunking if enable_chunking=True
+                    if loader_config_data.get("enable_chunking", False):
+                        if not loader_config_data.get("chunking_strategy"):
+                            raise ValueError("chunking_strategy is required when enable_chunking=True")
+                        if not loader_config_data.get("max_chunk_size"):
+                            raise ValueError("max_chunk_size is required when enable_chunking=True")
+                            
+                        loader_config_dict["chunking_strategy"] = ChunkingStrategy(loader_config_data["chunking_strategy"])
+                        loader_config_dict["max_chunk_size"] = loader_config_data["max_chunk_size"]
+                        
+                        if loader_config_data.get("chunk_overlap") is not None:
+                            loader_config_dict["chunk_overlap"] = loader_config_data["chunk_overlap"]
+                    
+                    loader_config = LoaderConfig(**loader_config_dict)
                     
                     loader = UniversalDataLoader(loader_config)
                     

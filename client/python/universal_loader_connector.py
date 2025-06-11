@@ -77,13 +77,27 @@ class UniversalLoaderConnector:
         # Convert processing config to loader_config format
         loader_config = {
             "output_format": processing_config.get("output_format", "documents"),
-            "chunking_strategy": processing_config.get("chunking_strategy"),
-            "max_chunk_size": processing_config.get("max_chunk_size", 1000),
-            "chunk_overlap": processing_config.get("chunk_overlap", 100),
+            "enable_chunking": processing_config.get("enable_chunking", False),
             "include_metadata": processing_config.get("include_metadata", True),
             "min_text_length": processing_config.get("min_text_length", 10),
             "remove_headers_footers": processing_config.get("remove_headers_footers", True)
         }
+        
+        # Add chunking parameters only if chunking is enabled
+        if processing_config.get("enable_chunking", False):
+            chunking_strategy = processing_config.get("chunking_strategy")
+            max_chunk_size = processing_config.get("max_chunk_size")
+            
+            if not chunking_strategy:
+                raise ValueError("chunking_strategy is required when enable_chunking=True")
+            if not max_chunk_size:
+                raise ValueError("max_chunk_size is required when enable_chunking=True")
+                
+            loader_config["chunking_strategy"] = chunking_strategy
+            loader_config["max_chunk_size"] = max_chunk_size
+            
+            if processing_config.get("chunk_overlap") is not None:
+                loader_config["chunk_overlap"] = processing_config["chunk_overlap"]
         
         # Remove None values
         loader_config = {k: v for k, v in loader_config.items() if v is not None}

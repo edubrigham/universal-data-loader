@@ -35,14 +35,19 @@
   ],
   
   "processing": {
-    "_comment": "RAG-optimized settings",
+    "_comment": "RAG-optimized settings - modern LLMs prefer complete documents",
     "output_format": "documents",
-    "chunking_strategy": "by_title",
-    "max_chunk_size": 600,
-    "chunk_overlap": 100,
     "include_metadata": true,
     "min_text_length": 50,
-    "remove_headers_footers": true
+    "remove_headers_footers": true,
+    "enable_chunking": false,
+    "_chunking_for_vector_db": {
+      "_comment": "Enable only for vector databases that require smaller segments",
+      "_enable_chunking": true,
+      "_chunking_strategy": "by_title",
+      "_max_chunk_size": 600,
+      "_chunk_overlap": 100
+    }
   },
   
   "batch_options": {

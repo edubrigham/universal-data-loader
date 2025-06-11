@@ -29,14 +29,19 @@
   ],
   
   "processing": {
-    "_comment": "Document processing settings",
+    "_comment": "Document processing settings - modern LLMs prefer complete documents",
     "output_format": "documents",
-    "chunking_strategy": "by_title",
-    "max_chunk_size": 600,
-    "chunk_overlap": 100,
     "include_metadata": true,
     "min_text_length": 50,
-    "remove_headers_footers": true
+    "remove_headers_footers": true,
+    "enable_chunking": false,
+    "_chunking_example": {
+      "_comment": "To enable chunking, set enable_chunking: true and add these required fields:",
+      "_enable_chunking": true,
+      "_chunking_strategy": "by_title",
+      "_max_chunk_size": 600,
+      "_chunk_overlap": 100
+    }
   },
   
   "batch_options": {

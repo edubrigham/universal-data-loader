@@ -44,11 +44,9 @@ def example_custom_config():
     """Example with custom configuration"""
     print("\n=== Custom Configuration Example ===")
     
-    # Create custom configuration
+    # Create custom configuration - no chunking by default
     config = LoaderConfig(
         output_format="text",
-        chunking_strategy="basic",
-        max_chunk_size=500,
         min_text_length=20,
         include_metadata=True
     )
@@ -59,7 +57,7 @@ def example_custom_config():
     sample_content = """
     # Introduction
     
-    This is a longer document for testing chunking capabilities.
+    This is a longer document for testing document processing capabilities.
     
     ## Section 1
     

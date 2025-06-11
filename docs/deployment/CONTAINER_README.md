@@ -200,8 +200,7 @@ curl -X POST "http://localhost:8000/process/url" \
   -d '{
     "url": "https://en.wikipedia.org/wiki/Artificial_intelligence",
     "output_format": "documents",
-    "chunking_strategy": "by_title",
-    "max_chunk_size": 800
+    "enable_chunking": false
   }'
 
 # Upload and process a file
@@ -231,9 +230,10 @@ curl -X POST "http://localhost:8000/process/batch" \
 ```json
 {
   "output_format": "documents",        // "documents" | "json" | "text"
-  "chunking_strategy": "by_title",     // null | "basic" | "by_title" | "by_page"
-  "max_chunk_size": 800,               // Characters per chunk
-  "chunk_overlap": 100,                // Overlap between chunks
+  "enable_chunking": false,            // Enable document chunking
+  "chunking_strategy": "by_title",     // Required if chunking: "basic" | "by_title" | "by_page"
+  "max_chunk_size": 800,               // Required if chunking: Characters per chunk
+  "chunk_overlap": 100,                // Optional when chunking: Overlap between chunks
   "include_metadata": true,            // Include document metadata
   "min_text_length": 50,               // Filter short content
   "remove_headers_footers": true,      // Clean up headers/footers
@@ -251,6 +251,8 @@ curl -X POST "http://localhost:8000/process/batch" \
       "path": "/data/document.pdf",
       "output_prefix": "company_docs",
       "custom_config": {                // Override global config
+        "enable_chunking": true,
+        "chunking_strategy": "basic", 
         "max_chunk_size": 1000
       }
     }

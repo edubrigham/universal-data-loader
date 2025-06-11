@@ -232,7 +232,7 @@ class ServerlessDataLoader:
 ```bash
 curl -X POST "http://localhost:8000/process/file" \
   -F "file=@document.pdf" \
-  -F 'config={"output_format":"documents","chunking_strategy":"by_title"}'
+  -F 'config={"output_format":"documents","enable_chunking":false}'
 ```
 
 #### URL Processing
@@ -242,7 +242,7 @@ curl -X POST "http://localhost:8000/process/url" \
   -d '{
     "url": "https://example.com/article",
     "output_format": "documents",
-    "max_chunk_size": 800,
+    "enable_chunking": false,
     "include_metadata": true
   }'
 ```
@@ -259,8 +259,7 @@ curl -X POST "http://localhost:8000/process/batch" \
     ],
     "loader_config": {
       "output_format": "documents",
-      "chunking_strategy": "by_title",
-      "max_chunk_size": 600
+      "enable_chunking": false
     },
     "max_workers": 3
   }'
@@ -295,9 +294,10 @@ All endpoints return LangChain-compatible documents:
 ```json
 {
   "output_format": "documents",        // "documents" | "json" | "text" | "elements"
-  "chunking_strategy": "by_title",     // null | "basic" | "by_title" | "by_page"
-  "max_chunk_size": 800,               // Characters per chunk
-  "chunk_overlap": 100,                // Overlap between chunks
+  "enable_chunking": false,            // Enable document chunking
+  "chunking_strategy": "by_title",     // Required if chunking: "basic" | "by_title" | "by_page"
+  "max_chunk_size": 800,               // Required if chunking: Characters per chunk
+  "chunk_overlap": 100,                // Optional when chunking: Overlap between chunks
   "include_metadata": true,            // Include document metadata
   "min_text_length": 50,               // Filter short content
   "remove_headers_footers": true,      // Clean up headers/footers
@@ -315,6 +315,8 @@ All endpoints return LangChain-compatible documents:
       "path": "/data/document.pdf",
       "output_prefix": "company_docs",
       "custom_config": {                // Override global config per source
+        "enable_chunking": true,
+        "chunking_strategy": "basic",
         "max_chunk_size": 1000
       }
     }
@@ -354,9 +356,7 @@ class RAGDataLoader:
             "sources": document_sources,
             "loader_config": {
                 "output_format": "documents",
-                "chunking_strategy": "by_title",
-                "max_chunk_size": 600,
-                "chunk_overlap": 100
+                "enable_chunking": false
             }
         })
         
@@ -401,10 +401,8 @@ class TrainingDataPreparator:
             "sources": sources,
             "loader_config": {
                 "output_format": "text",
-                "chunking_strategy": "basic",
-                "max_chunk_size": 2000,
-                "chunk_overlap": 50,
-                "include_metadata": False,
+                "enable_chunking": false,
+                "include_metadata": false,
                 "min_text_length": 100
             }
         })

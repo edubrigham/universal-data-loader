@@ -70,9 +70,8 @@ your_llm_app/
   ],
   "processing": {
     "output_format": "documents",
-    "chunking_strategy": "by_title",
-    "max_chunk_size": 600,
-    "include_metadata": true
+    "include_metadata": true,
+    "enable_chunking": false
   },
   "batch_options": {
     "max_workers": 3,
@@ -100,10 +99,15 @@ your_llm_app/
   ],
   "processing": {
     "output_format": "documents",
-    "chunking_strategy": "by_title",
-    "max_chunk_size": 600,
-    "chunk_overlap": 100,
-    "include_metadata": true
+    "include_metadata": true,
+    "enable_chunking": false,
+    "_chunking_example": {
+      "_comment": "To enable chunking for vector databases:",
+      "_enable_chunking": true,
+      "_chunking_strategy": "by_title",
+      "_max_chunk_size": 600,
+      "_chunk_overlap": 100
+    }
   }
 }
 ```
@@ -124,9 +128,8 @@ your_llm_app/
   ],
   "processing": {
     "output_format": "text",
-    "chunking_strategy": "basic",
-    "max_chunk_size": 2000,
-    "include_metadata": false
+    "include_metadata": false,
+    "enable_chunking": false
   }
 }
 ```
@@ -251,9 +254,10 @@ python -c "from universal_loader_connector import get_documents; print(len(get_d
 | Option | Default | Description |
 |--------|---------|-------------|
 | `output_format` | `"documents"` | Output format: `documents`, `text`, `json`, `elements` |
-| `chunking_strategy` | `null` | Chunking: `null`, `basic`, `by_title`, `by_page` |
-| `max_chunk_size` | `600` | Maximum characters per chunk |
-| `chunk_overlap` | `100` | Overlap between chunks |
+| `enable_chunking` | `false` | Enable document chunking |
+| `chunking_strategy` | `null` | Required if chunking enabled: `basic`, `by_title`, `by_page` |
+| `max_chunk_size` | `null` | Required if chunking enabled: Maximum characters per chunk |
+| `chunk_overlap` | `null` | Optional when chunking: Overlap between chunks |
 | `include_metadata` | `true` | Include document metadata |
 | `min_text_length` | `50` | Filter out short content |
 | `remove_headers_footers` | `true` | Clean headers/footers |
@@ -301,9 +305,10 @@ documents = get_documents()
 ## 🎯 Best Practices
 
 ### 1. **Use Appropriate Configs**
-- **RAG systems**: Use `chunking_strategy: "by_title"` with 600-800 char chunks
+- **Modern RAG systems**: Use `enable_chunking: false` to leverage large context windows
+- **Legacy vector databases**: Use `enable_chunking: true` with `chunking_strategy: "by_title"` and 600-800 char chunks
 - **Training data**: Use `output_format: "text"` with no metadata
-- **Document analysis**: Use `chunking_strategy: null` to preserve context
+- **Document analysis**: Use `enable_chunking: false` to preserve complete context
 
 ### 2. **Organize Sources**
 - Group related sources in separate config files
