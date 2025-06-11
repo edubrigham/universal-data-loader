@@ -127,26 +127,45 @@ loader = UniversalDataLoader(config)
 
 ```python
 # Load a PDF document
-elements = loader.load_file("research_paper.pdf")
+documents = loader.load_file("research_paper.pdf")
 
 # Load a Word document with custom settings
 config = LoaderConfig(chunking_strategy=ChunkingStrategy.BASIC, max_chunk_size=500)
 loader = UniversalDataLoader(config)
-elements = loader.load_file("report.docx")
+documents = loader.load_file("report.docx")
 ```
 
 ### Directory Processing
 
+The Universal Data Loader excels at processing entire directories with mixed file types:
+
 ```python
 # Process all supported files in a directory
-elements = loader.load_directory("documents/", recursive=True)
+documents = loader.load_directory("documents/", recursive=True)
 
-# Process with filtering
-for element in elements:
-    if element.get('source_file', '').endswith('.pdf'):
-        # Handle PDF-specific processing
-        pass
+# The result is a DocumentCollection with all files processed
+print(f"Processed {len(documents)} documents from directory")
+
+# Filter by source file type
+pdf_docs = []
+for doc in documents:
+    if doc.get_metadata('source_file', '').endswith('.pdf'):
+        pdf_docs.append(doc)
+
+# Filter by element type
+title_docs = documents.filter_by_metadata('element_type', 'Title')
+
+# Get collection statistics
+stats = documents.get_statistics()
+print(f"Total words: {stats['total_words']}")
 ```
+
+**Supported File Types in Directories:**
+- PDFs, Word docs, PowerPoint, Excel
+- HTML, Markdown, Text files  
+- CSV files, Email files (EML/MSG)
+- JSON, XML, RTF files
+- Automatically detects and processes each type appropriately
 
 ### URL Processing
 
@@ -375,6 +394,9 @@ python examples/config_examples.py
 
 # LangChain integration examples
 python examples/langchain_integration.py
+
+# Directory processing examples
+python examples/directory_processing.py
 ```
 
 ## Contributing
