@@ -235,8 +235,8 @@ class UniversalLoaderConnector:
             status = response.json()
             
             if status["status"] == "completed":
-                # Download documents
-                response = self.session.get(f"{self.microservice_url}/download/{job_id}")
+                # Download documents using the correct endpoint
+                response = self.session.get(f"{self.microservice_url}/jobs/{job_id}/download")
                 response.raise_for_status()
                 result = response.json()
                 
