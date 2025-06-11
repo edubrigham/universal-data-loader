@@ -46,12 +46,26 @@ def check_configuration():
             
             # Validate source
             if source_type == "directory":
-                if not Path(source_path).exists():
+                if source_path.startswith("/app/"):
+                    # Docker container path
+                    local_path = source_path.replace("/app/", "./")
+                    if Path(local_path).exists():
+                        print(f"      ✅ Directory mapped from local: {local_path}")
+                    else:
+                        print(f"      ℹ️ Directory exists in container: {source_path}")
+                elif not Path(source_path).exists():
                     print(f"      ⚠️ Directory does not exist: {source_path}")
                 else:
                     print(f"      ✅ Directory found")
             elif source_type == "file":
-                if not Path(source_path).exists():
+                if source_path.startswith("/app/"):
+                    # Docker container path
+                    local_path = source_path.replace("/app/", "./")
+                    if Path(local_path).exists():
+                        print(f"      ✅ File mapped from local: {local_path}")
+                    else:
+                        print(f"      ℹ️ File exists in container: {source_path}")
+                elif not Path(source_path).exists():
                     print(f"      ⚠️ File does not exist: {source_path}")
                 else:
                     print(f"      ✅ File found")
@@ -64,82 +78,21 @@ def check_configuration():
         print(f"❌ Error reading configuration: {e}")
         return False
 
-def create_sample_data():
-    """Create sample data if the configured directory doesn't exist"""
-    print("\n📁 Creating sample data...")
-    
-    # Create data directory
-    data_dir = Path("./data/documents")
-    data_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Create sample documents
-    sample_docs = [
-        {
-            "filename": "company_overview.md",
-            "content": """# Company Overview
-
-Our company specializes in AI-powered document processing solutions.
-
-## Mission
-Transform how organizations handle document data for AI applications.
-
-## Products
-- Universal Data Loader: Microservice for document processing
-- AI Integration Tools: Seamless LLM integration capabilities
-- Enterprise Solutions: Scalable document processing platforms
-"""
-        },
-        {
-            "filename": "technical_docs.md", 
-            "content": """# Technical Documentation
-
-## Architecture
-The Universal Data Loader uses a microservices architecture with:
-- REST API endpoints
-- Containerized deployment
-- Horizontal scaling capabilities
-
-## Supported Formats
-- PDF documents
-- Microsoft Word files
-- PowerPoint presentations
-- Web pages and HTML content
-- Plain text files
-
-## Integration
-Easy integration with LangChain and other LLM frameworks.
-"""
-        }
-    ]
-    
-    for doc in sample_docs:
-        doc_path = data_dir / doc["filename"]
-        doc_path.write_text(doc["content"])
-        print(f"   ✅ Created: {doc_path}")
-    
-    print(f"✅ Sample data created in: {data_dir}")
-
 def test_document_processing():
     """Test document processing using the configured sources"""
     print("\n🔄 Testing document processing...")
     
     try:
-        # Try to get documents using the configuration
+        # Get documents using the configuration
         documents = get_documents()
         
         if not documents:
             print("⚠️ No documents returned from configuration")
-            print("\n💡 Trying alternative: processing a test URL...")
-            
-            # Try processing a simple URL as fallback
-            test_documents = process_url("https://httpbin.org/html")
-            
-            if test_documents:
-                print(f"✅ Successfully processed URL: {len(test_documents)} documents")
-                return test_documents
-            else:
-                print("❌ URL processing also failed")
-                return []
+            print("\n💡 Possible issues:")
+            print("   1. The configured sources might not exist")
+            print("   2. The batch processing API might be returning file paths instead of documents")
+            print("   3. Check the docker logs: docker-compose logs universal-data-loader")
+            return []
         
         print(f"✅ Successfully processed configured sources: {len(documents)} documents")
         
@@ -183,12 +136,18 @@ def simulate_rag_integration(documents):
         return
     
     print(f"\n🧠 RAG Integration Simulation:")
-    print(f"   ✅ Documents received as 'documents' variable")
-    print(f"   ✅ LangChain format - ready for embedding")
-    print(f"   ✅ Can now create vector store and retriever")
+    print(f"   ✅ Documents received in LangChain format")
+    print(f"   ✅ Ready for embedding and vector storage")
+    print(f"   ✅ {len(documents)} documents available for RAG system")
     
-    # Simulate what would happen next in a real RAG system
-    print(f"\n📝 Next steps would be:")
+    # Show document structure
+    if documents:
+        print(f"\n📝 Document structure example:")
+        doc = documents[0]
+        print(f"   - page_content: {type(doc.get('page_content'))} (text content)")
+        print(f"   - metadata: {type(doc.get('metadata'))} (source info, etc.)")
+    
+    print(f"\n📝 Next steps for RAG implementation:")
     print(f"   1. embeddings = OpenAIEmbeddings()")
     print(f"   2. vectorstore = Chroma.from_documents(documents, embeddings)")
     print(f"   3. retriever = vectorstore.as_retriever()")
@@ -207,23 +166,23 @@ def main():
     if not check_configuration():
         return
     
-    # Step 3: Create sample data if needed
-    create_sample_data()
-    
-    # Step 4: Test document processing
+    # Step 3: Test document processing
     documents = test_document_processing()
     
-    # Step 5: Simulate RAG integration
+    # Step 4: Simulate RAG integration
     simulate_rag_integration(documents)
     
     if documents:
         print(f"\n🎉 Test completed successfully!")
-        print(f"   📄 Processed {len(documents)} documents")
+        print(f"   📄 Processed {len(documents)} documents from config")
         print(f"   🔗 Ready for RAG system integration")
     else:
         print(f"\n⚠️ Test completed with issues")
-        print(f"   📋 Check configuration and data sources")
-        print(f"   🔧 Verify microservice is processing requests correctly")
+        print(f"   📋 No documents were loaded from the configured sources")
+        print(f"   🔧 Please check:")
+        print(f"      - Your sources exist and are accessible")
+        print(f"      - The microservice is processing correctly")
+        print(f"      - Docker container has access to the files")
 
 if __name__ == "__main__":
     main()

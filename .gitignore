@@ -75,6 +75,9 @@ tmp/
 *.tmp
 *.temp
 
+# Test data
+data/
+
 # Logs
 *.log
 logs/
