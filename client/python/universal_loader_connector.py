@@ -74,10 +74,24 @@ class UniversalLoaderConnector:
         
         self.logger.info(f"Processing {len(sources)} sources from {config_name}.json")
         
+        # Convert processing config to loader_config format
+        loader_config = {
+            "output_format": processing_config.get("output_format", "documents"),
+            "chunking_strategy": processing_config.get("chunking_strategy"),
+            "max_chunk_size": processing_config.get("max_chunk_size", 1000),
+            "chunk_overlap": processing_config.get("chunk_overlap", 100),
+            "include_metadata": processing_config.get("include_metadata", True),
+            "min_text_length": processing_config.get("min_text_length", 10),
+            "remove_headers_footers": processing_config.get("remove_headers_footers", True)
+        }
+        
+        # Remove None values
+        loader_config = {k: v for k, v in loader_config.items() if v is not None}
+        
         # Prepare batch request
         payload = {
             "sources": sources,
-            "loader_config": processing_config,
+            "loader_config": loader_config,
             "output_config": {
                 "separate_by_source": True,
                 "merge_all": batch_options.get("merge_all", True)
@@ -210,7 +224,7 @@ class UniversalLoaderConnector:
                 # Download documents
                 response = self.session.get(f"{self.microservice_url}/download/{job_id}")
                 response.raise_for_status()
-                documents = response.json()
+                result = response.json()
                 
                 # Cleanup job
                 try:
@@ -218,15 +232,27 @@ class UniversalLoaderConnector:
                 except:
                     pass
                 
-                # Handle batch results vs single document results
-                if isinstance(documents, list):
-                    return documents
-                elif isinstance(documents, dict) and "output_files" in documents:
-                    # This is a batch result summary - extract actual documents
-                    # In practice, you'd download the actual files from output_files
-                    return []
+                # Handle different result types
+                if isinstance(result, list):
+                    # Direct list of documents (from file/URL processing)
+                    return result
+                elif isinstance(result, dict):
+                    if "output_files" in result:
+                        # Batch processing result - need to extract documents
+                        # For now, return empty list but log the issue
+                        self.logger.warning(f"Batch processing completed but documents are in files: {result['output_files']}")
+                        # In a real implementation, you'd need to download these files
+                        # For now, let's try a different approach
+                        return []
+                    elif "page_content" in result:
+                        # Single document
+                        return [result]
+                    else:
+                        # Unknown format
+                        self.logger.warning(f"Unknown result format: {list(result.keys())}")
+                        return []
                 else:
-                    return [documents] if documents else []
+                    return []
             
             elif status["status"] == "failed":
                 error_msg = status.get("error_message", "Unknown error")

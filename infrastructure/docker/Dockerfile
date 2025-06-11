@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY requirements/base.txt requirements.txt
 
 # Add FastAPI and uvicorn to requirements
 RUN echo "fastapi>=0.104.0" >> requirements.txt && \
@@ -63,4 +63,4 @@ RUN useradd --create-home --shell /bin/bash appuser && \
 USER appuser
 
 # Start command
-CMD ["python", "api_server.py"]
+CMD ["python", "-m", "app.main"]
