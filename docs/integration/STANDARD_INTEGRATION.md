@@ -245,7 +245,8 @@ python -c "from universal_loader_connector import get_documents; print(len(get_d
 
 | Type | Description | Required Fields | Optional Fields |
 |------|-------------|----------------|----------------|
-| `url` | Web content | `path` | `output_prefix` |
+| `url` | Single web page | `path` | `output_prefix` |
+| `url_list` | Multiple URLs from text file | `path` | `output_prefix` |
 | `file` | Single file | `path` | `output_prefix` |
 | `directory` | Folder of files | `path` | `recursive`, `include_patterns`, `exclude_patterns`, `output_prefix` |
 

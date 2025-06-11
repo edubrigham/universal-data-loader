@@ -6,10 +6,16 @@
   
   "sources": [
     {
-      "_example": "URL source",
+      "_example": "Single URL",
       "type": "url",
       "path": "https://docs.your-company.com",
       "output_prefix": "company_docs"
+    },
+    {
+      "_example": "Multiple URLs from text file",
+      "type": "url_list",
+      "path": "./data/urls.txt",
+      "output_prefix": "web_content"
     },
     {
       "_example": "Local file",

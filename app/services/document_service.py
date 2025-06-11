@@ -42,6 +42,82 @@ class DocumentProcessingService:
         return LoaderConfig(**config_dict)
     
     @staticmethod
+    def _process_url_list(loader, file_path: str, source_data: Dict[str, Any]):
+        """Process multiple URLs from a text file"""
+        from pathlib import Path
+        
+        file_path_obj = Path(file_path)
+        if not file_path_obj.exists():
+            raise FileNotFoundError(f"URL list file not found: {file_path}")
+        
+        # Read URLs from file
+        with open(file_path_obj, 'r', encoding='utf-8') as f:
+            urls = [line.strip() for line in f if line.strip() and not line.strip().startswith('#')]
+        
+        if not urls:
+            print(f"⚠️ No URLs found in file: {file_path}")
+            return []
+        
+        print(f"📋 Processing {len(urls)} URLs from {file_path}")
+        
+        all_documents = []
+        failed_urls = []
+        
+        for i, url in enumerate(urls):
+            try:
+                print(f"   🔗 Processing URL {i+1}/{len(urls)}: {url}")
+                documents = loader.load_url(url)
+                
+                # Convert to standard format and add metadata
+                if hasattr(documents, 'to_dicts'):
+                    doc_list = documents.to_dicts()
+                elif isinstance(documents, list):
+                    doc_list = documents
+                else:
+                    doc_list = [documents] if documents else []
+                
+                # Add URL list metadata
+                for doc in doc_list:
+                    if isinstance(doc, dict):
+                        doc['metadata'] = doc.get('metadata', {})
+                        doc['metadata']['url_list_source'] = file_path
+                        doc['metadata']['url_index'] = i + 1
+                        doc['metadata']['source_url'] = url
+                        if source_data.get('output_prefix'):
+                            doc['metadata']['output_prefix'] = source_data['output_prefix']
+                
+                all_documents.extend(doc_list)
+                print(f"      ✅ Successfully processed: {len(doc_list)} documents")
+                
+            except Exception as e:
+                failed_urls.append(url)
+                print(f"      ❌ Failed to process {url}: {e}")
+                continue
+        
+        print(f"📊 URL List Summary:")
+        print(f"   ✅ Successfully processed: {len(urls) - len(failed_urls)}/{len(urls)} URLs")
+        print(f"   📄 Total documents: {len(all_documents)}")
+        if failed_urls:
+            print(f"   ❌ Failed URLs: {len(failed_urls)}")
+            for url in failed_urls[:3]:  # Show first 3 failed URLs
+                print(f"      - {url}")
+            if len(failed_urls) > 3:
+                print(f"      ... and {len(failed_urls) - 3} more")
+        
+        # Return documents in a format compatible with existing code
+        class MockDocuments:
+            def __init__(self, docs):
+                self.docs = docs
+            
+            def to_dicts(self):
+                return self.docs
+            
+            def __len__(self):
+                return len(self.docs)
+        
+        return MockDocuments(all_documents)
+    
+    @staticmethod
     async def process_file(job_id: str, file_path: str, config: Dict[str, Any]):
         """Process a single file"""
         try:
@@ -157,6 +233,9 @@ class DocumentProcessingService:
                     elif source_type == "directory":
                         recursive = source_data.get("recursive", True)
                         documents = loader.load_directory(source_path, recursive=recursive)
+                    elif source_type == "url_list":
+                        # Process multiple URLs from a text file
+                        documents = DocumentProcessingService._process_url_list(loader, source_path, source_data)
                     else:
                         raise ValueError(f"Unknown source type: {source_type}")
                     

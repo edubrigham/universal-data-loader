@@ -82,6 +82,11 @@ Create `config/documents.json` to define your document sources:
       "type": "url",
       "path": "https://your-company.com/docs",
       "output_prefix": "company_docs"
+    },
+    {
+      "type": "url_list",
+      "path": "./data/urls.txt",
+      "output_prefix": "web_content"
     }
   ],
   "processing": {
@@ -90,6 +95,14 @@ Create `config/documents.json` to define your document sources:
     "min_text_length": 10
   }
 }
+```
+
+**URL List Format (`./data/urls.txt`):**
+```
+https://company.com/page1
+https://company.com/page2
+# Comments are ignored
+https://company.com/page3
 ```
 
 Then load all sources at once:
