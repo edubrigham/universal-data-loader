@@ -11,6 +11,7 @@ class OutputFormat(str, Enum):
     JSON = "json"
     TEXT = "text"
     ELEMENTS = "elements"
+    DOCUMENTS = "documents"  # LangChain-compatible Document objects
 
 
 class ChunkingStrategy(str, Enum):
@@ -24,7 +25,7 @@ class LoaderConfig(BaseModel):
     """Configuration for the Universal Data Loader"""
     
     # Output settings
-    output_format: OutputFormat = Field(default=OutputFormat.JSON, description="Format for output data")
+    output_format: OutputFormat = Field(default=OutputFormat.DOCUMENTS, description="Format for output data")
     include_metadata: bool = Field(default=True, description="Whether to include metadata in output")
     
     # Processing settings

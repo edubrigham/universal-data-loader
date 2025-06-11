@@ -18,6 +18,7 @@ from .utils import (
     get_file_stats,
     count_elements_by_type
 )
+from .document import DocumentCollection
 
 
 def setup_parser() -> argparse.ArgumentParser:
@@ -27,11 +28,14 @@ def setup_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Load a PDF and save as JSON
+  # Load a PDF and save as LangChain Documents (default)
   uloader document.pdf -o output.json
   
   # Process with RAG-optimized settings
   uloader document.pdf -o output.json --preset rag
+  
+  # Save as JSON format instead of documents
+  uloader document.pdf -o output.json --format json
   
   # Process directory with custom chunk size
   uloader docs/ -o results.json --chunk-size 800
@@ -62,9 +66,9 @@ Examples:
     
     parser.add_argument(
         "--format",
-        choices=["json", "text", "elements"],
-        default="json",
-        help="Output format (default: json)"
+        choices=["documents", "json", "text", "elements"],
+        default="documents",
+        help="Output format (default: documents - LangChain compatible)"
     )
     
     # Configuration presets
@@ -248,37 +252,52 @@ def process_input(loader: UniversalDataLoader, input_path: str, args) -> list:
         raise ValueError(f"Invalid input type: {input_path}")
 
 
-def show_statistics(elements: list, verbose: bool = False):
+def show_statistics(data, verbose: bool = False):
     """Show processing statistics"""
-    print(f"\nProcessing Statistics:")
-    print(f"Total elements: {len(elements)}")
-    
-    if elements:
-        # Count by type
-        type_counts = count_elements_by_type(elements)
-        print("Elements by type:")
-        for element_type, count in sorted(type_counts.items()):
-            print(f"  {element_type}: {count}")
+    if isinstance(data, DocumentCollection):
+        # Handle DocumentCollection
+        stats = data.get_statistics()
+        print(f"\nProcessing Statistics:")
+        print(f"Total documents: {stats['document_count']}")
+        print(f"Total characters: {stats['total_characters']:,}")
+        print(f"Total words: {stats['total_words']:,}")
+        print(f"Average chars per document: {stats['average_characters']:.1f}")
+        print(f"Average words per document: {stats['average_words']:.1f}")
         
-        if verbose:
-            # Calculate text statistics
-            total_chars = 0
-            total_words = 0
+        if verbose and stats['metadata_keys']:
+            print(f"\nMetadata fields: {', '.join(stats['metadata_keys'])}")
             
-            for element in elements:
-                if isinstance(element, dict):
-                    text = element.get('text', '')
-                else:
-                    text = str(element)
+    else:
+        # Handle lists (legacy format)
+        print(f"\nProcessing Statistics:")
+        print(f"Total elements: {len(data)}")
+        
+        if data:
+            # Count by type
+            type_counts = count_elements_by_type(data)
+            print("Elements by type:")
+            for element_type, count in sorted(type_counts.items()):
+                print(f"  {element_type}: {count}")
+            
+            if verbose:
+                # Calculate text statistics
+                total_chars = 0
+                total_words = 0
                 
-                total_chars += len(text)
-                total_words += len(text.split())
-            
-            print(f"\nText Statistics:")
-            print(f"Total characters: {total_chars:,}")
-            print(f"Total words: {total_words:,}")
-            print(f"Average chars per element: {total_chars / len(elements):.1f}")
-            print(f"Average words per element: {total_words / len(elements):.1f}")
+                for element in data:
+                    if isinstance(element, dict):
+                        text = element.get('text', '')
+                    else:
+                        text = str(element)
+                    
+                    total_chars += len(text)
+                    total_words += len(text.split())
+                
+                print(f"\nText Statistics:")
+                print(f"Total characters: {total_chars:,}")
+                print(f"Total words: {total_words:,}")
+                print(f"Average chars per element: {total_chars / len(data):.1f}")
+                print(f"Average words per element: {total_words / len(data):.1f}")
 
 
 def main():
@@ -298,16 +317,16 @@ def main():
         # Process input
         if args.verbose:
             print(f"Processing input: {args.input}")
-        elements = process_input(loader, args.input, args)
+        result = process_input(loader, args.input, args)
         
         # Save output
         if args.verbose:
             print(f"Saving output to: {args.output}")
-        loader.save_output(elements, args.output)
+        loader.save_output(result, args.output)
         
         # Show statistics if requested
         if args.stats or args.verbose:
-            show_statistics(elements, verbose=args.verbose)
+            show_statistics(result, verbose=args.verbose)
         
         print(f"✓ Successfully processed and saved to {args.output}")
         

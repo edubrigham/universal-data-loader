@@ -4,6 +4,7 @@ A Python library that provides a universal interface for loading and processing 
 
 ## Features
 
+- **LangChain Compatible**: Native support for LangChain Document format - plug and play with any LLM framework
 - **Multi-format Support**: Process PDF, DOCX, HTML, TXT, CSV, XLSX, PPTX, EML, and more
 - **Flexible Configuration**: Customizable processing options for different use cases
 - **Chunking Strategies**: Multiple chunking approaches for optimal text segmentation
@@ -11,6 +12,7 @@ A Python library that provides a universal interface for loading and processing 
 - **RAG-Optimized**: Pre-configured settings for Retrieval-Augmented Generation
 - **Batch Processing**: Process entire directories of documents
 - **URL Support**: Load and process content directly from URLs
+- **Rich Metadata**: Preserve and enhance document metadata for better retrieval
 
 ## Installation
 
@@ -38,10 +40,10 @@ pip install -r requirements.txt
 The easiest way to use the Universal Data Loader is through the command line:
 
 ```bash
-# Basic usage - load a PDF and save as JSON
+# Basic usage - load a PDF and save as LangChain Documents (default)
 python uloader.py document.pdf -o output.json
 
-# With RAG-optimized settings
+# With RAG-optimized settings  
 python uloader.py document.pdf -o output.json --preset rag
 
 # Process with custom chunk size and show statistics
@@ -52,19 +54,36 @@ python uloader.py documents/ -o results.json --recursive
 
 # Load from URL
 python uloader.py https://example.com/article -o article.json
+
+# Save in different formats
+python uloader.py document.pdf -o output.json --format documents  # LangChain Documents (default)
+python uloader.py document.pdf -o output.json --format json       # Raw JSON
+python uloader.py document.pdf -o output.txt --format text        # Plain text
 ```
 
 ### Python API
 
 ```python
-from universal_loader import UniversalDataLoader, LoaderConfig
+from universal_loader import UniversalDataLoader, LoaderConfig, Document, DocumentCollection
 
-# Basic usage with default settings
+# Basic usage - returns LangChain-compatible Documents by default
 loader = UniversalDataLoader()
-elements = loader.load_file("document.pdf")
+documents = loader.load_file("document.pdf")  # Returns DocumentCollection
+
+# Use documents directly in LangChain
+for doc in documents:
+    print(f"Content: {doc.page_content}")
+    print(f"Metadata: {doc.metadata}")
+
+# Convert to list for LangChain functions
+docs_list = documents.to_list()  # List[Document]
+
+# Get statistics
+stats = documents.get_statistics()
+print(f"Loaded {stats['document_count']} documents")
 
 # Save processed output
-loader.save_output(elements, "output.json")
+loader.save_output(documents, "output.json")
 ```
 
 ## Configuration Options
@@ -282,7 +301,7 @@ uloader large_document.pdf -o output.json --preset training --no-metadata
 | Option | Description | Example |
 |--------|-------------|---------|
 | `--preset` | Use predefined configuration | `--preset rag` |
-| `--format` | Output format (json/text/elements) | `--format text` |
+| `--format` | Output format (documents/json/text/elements) | `--format documents` |
 | `--chunk-strategy` | Chunking method | `--chunk-strategy by_title` |
 | `--chunk-size` | Maximum chunk size | `--chunk-size 800` |
 | `--chunk-overlap` | Overlap between chunks | `--chunk-overlap 100` |
@@ -290,6 +309,58 @@ uloader large_document.pdf -o output.json --preset training --no-metadata
 | `--extract-images` | Extract images from docs | `--extract-images` |
 | `--stats` | Show processing statistics | `--stats` |
 | `--verbose` | Detailed output | `--verbose` |
+
+## LangChain Integration
+
+The Universal Data Loader is designed for seamless integration with LangChain and other LLM frameworks:
+
+### Direct LangChain Compatibility
+
+```python
+from universal_loader import UniversalDataLoader
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+
+# Load documents - returns LangChain-compatible Documents
+loader = UniversalDataLoader()
+documents = loader.load_file("research_paper.pdf")
+
+# Use directly with LangChain vector stores
+embeddings = OpenAIEmbeddings()
+vectorstore = Chroma.from_documents(
+    documents=documents.to_list(),  # Convert to List[Document]
+    embedding=embeddings
+)
+
+# Ready for RAG applications
+retriever = vectorstore.as_retriever()
+```
+
+### Enhanced Metadata for Better Retrieval
+
+```python
+# Documents include rich metadata for enhanced retrieval
+for doc in documents:
+    print(f"Content: {doc.page_content}")
+    print(f"Source: {doc.metadata['filename']}")
+    print(f"Page: {doc.metadata.get('page_number', 'N/A')}")
+    print(f"Element Type: {doc.metadata['element_type']}")
+```
+
+### Collection Operations
+
+```python
+# Filter documents by metadata
+technical_docs = documents.filter_by_metadata("element_type", "NarrativeText")
+
+# Filter by content length  
+long_docs = documents.filter_by_content_length(min_length=100)
+
+# Get collection statistics
+stats = documents.get_statistics()
+print(f"Total documents: {stats['document_count']}")
+print(f"Average length: {stats['average_characters']} chars")
+```
 
 ## Python API Examples
 
@@ -301,6 +372,9 @@ python examples/basic_usage.py
 
 # Configuration examples
 python examples/config_examples.py
+
+# LangChain integration examples
+python examples/langchain_integration.py
 ```
 
 ## Contributing

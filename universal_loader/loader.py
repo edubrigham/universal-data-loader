@@ -22,6 +22,7 @@ from unstructured.chunking.basic import chunk_elements
 from unstructured.staging.base import elements_to_json, convert_to_dict
 
 from .config import LoaderConfig, OutputFormat, ChunkingStrategy
+from .document import Document, DocumentCollection
 
 
 class UniversalDataLoader:
@@ -37,7 +38,7 @@ class UniversalDataLoader:
         """Initialize the loader with configuration"""
         self.config = config or LoaderConfig()
         
-    def load_file(self, file_path: Union[str, Path]) -> List[Dict[str, Any]]:
+    def load_file(self, file_path: Union[str, Path]) -> Union[List[Dict[str, Any]], List[Document], DocumentCollection]:
         """
         Load and process a single file
         
@@ -45,7 +46,11 @@ class UniversalDataLoader:
             file_path: Path to the file to process
             
         Returns:
-            List of processed document elements
+            Processed documents in the format specified by config.output_format:
+            - DOCUMENTS: DocumentCollection with Document objects (default)
+            - JSON: List of dictionaries
+            - TEXT: List of text dictionaries 
+            - ELEMENTS: Raw unstructured elements
         """
         file_path = Path(file_path)
         
@@ -73,7 +78,7 @@ class UniversalDataLoader:
         return self._format_output(elements)
         
     def load_directory(self, directory_path: Union[str, Path], 
-                      recursive: bool = True) -> List[Dict[str, Any]]:
+                      recursive: bool = True) -> Union[List[Dict[str, Any]], List[Document], DocumentCollection]:
         """
         Load and process all supported files in a directory
         
@@ -82,14 +87,14 @@ class UniversalDataLoader:
             recursive: Whether to search subdirectories
             
         Returns:
-            List of processed document elements from all files
+            Processed documents from all files in the format specified by config.output_format
         """
         directory_path = Path(directory_path)
         
         if not directory_path.exists():
             raise FileNotFoundError(f"Directory not found: {directory_path}")
             
-        all_elements = []
+        all_documents = DocumentCollection() if self.config.output_format == OutputFormat.DOCUMENTS else []
         
         if recursive:
             file_pattern = "**/*"
@@ -100,18 +105,26 @@ class UniversalDataLoader:
             if (file_path.is_file() and 
                 file_path.suffix.lower() in self.SUPPORTED_EXTENSIONS):
                 try:
-                    elements = self.load_file(file_path)
-                    # Add source file metadata
-                    for element in elements:
-                        if isinstance(element, dict):
-                            element['source_file'] = str(file_path)
-                    all_elements.extend(elements)
+                    result = self.load_file(file_path)
+                    
+                    if self.config.output_format == OutputFormat.DOCUMENTS:
+                        # result is a DocumentCollection, add its documents
+                        for doc in result:
+                            doc.add_metadata('source_file', str(file_path))
+                        all_documents.add_documents(result.to_list())
+                    else:
+                        # result is a list, add source file metadata and extend
+                        for element in result:
+                            if isinstance(element, dict):
+                                element['source_file'] = str(file_path)
+                        all_documents.extend(result)
+                        
                 except Exception as e:
                     print(f"Warning: Failed to process {file_path}: {e}")
                     
-        return all_elements
+        return all_documents
         
-    def load_url(self, url: str) -> List[Dict[str, Any]]:
+    def load_url(self, url: str) -> Union[List[Dict[str, Any]], List[Document], DocumentCollection]:
         """
         Load and process content from a URL
         
@@ -119,7 +132,7 @@ class UniversalDataLoader:
             url: URL to process
             
         Returns:
-            List of processed document elements
+            Processed documents in the format specified by config.output_format
         """
         # Use unstructured's URL handling
         elements = partition(url=url, **self.config.custom_partition_kwargs)
@@ -222,10 +235,41 @@ class UniversalDataLoader:
                 overlap=self.config.chunk_overlap
             )
             
-    def _format_output(self, elements) -> List[Dict[str, Any]]:
+    def _format_output(self, elements) -> Union[List[Dict[str, Any]], DocumentCollection]:
         """Format elements according to output configuration"""
         if self.config.output_format == OutputFormat.ELEMENTS:
             return elements
+            
+        elif self.config.output_format == OutputFormat.DOCUMENTS:
+            # Convert elements to LangChain-compatible Documents
+            documents = DocumentCollection()
+            
+            for element in elements:
+                # Extract text content
+                text_content = str(element)
+                
+                # Create metadata
+                metadata = {}
+                if self.config.include_metadata:
+                    # Add element-specific metadata
+                    if hasattr(element, 'category'):
+                        metadata['element_type'] = element.category
+                    if hasattr(element, 'metadata') and element.metadata:
+                        # Convert unstructured metadata to dict if needed
+                        if hasattr(element.metadata, 'to_dict'):
+                            metadata.update(element.metadata.to_dict())
+                        elif isinstance(element.metadata, dict):
+                            metadata.update(element.metadata)
+                    
+                    # Add element ID if available
+                    if hasattr(element, 'id'):
+                        metadata['element_id'] = element.id
+                
+                # Create Document
+                doc = Document(page_content=text_content, metadata=metadata)
+                documents.add_document(doc)
+            
+            return documents
             
         elif self.config.output_format == OutputFormat.TEXT:
             text_elements = []
@@ -239,23 +283,37 @@ class UniversalDataLoader:
         else:  # JSON format
             return convert_to_dict(elements)
             
-    def save_output(self, elements: List[Dict[str, Any]], 
+    def save_output(self, data: Union[List[Dict[str, Any]], DocumentCollection], 
                    output_path: Union[str, Path]) -> None:
         """
-        Save processed elements to file
+        Save processed data to file
         
         Args:
-            elements: Processed elements to save
+            data: Processed data to save (documents, elements, or dicts)
             output_path: Path to save the output
         """
         output_path = Path(output_path)
         
-        if self.config.output_format == OutputFormat.JSON:
+        if isinstance(data, DocumentCollection):
+            # Handle DocumentCollection
+            if self.config.output_format == OutputFormat.DOCUMENTS:
+                # Save as JSON representation of documents
+                docs_data = data.to_dicts()
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    json.dump(docs_data, f, indent=2, ensure_ascii=False)
+            else:
+                # Save as text
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    for doc in data:
+                        f.write(f"{doc.page_content}\n\n")
+        elif self.config.output_format == OutputFormat.JSON:
+            # Handle list of dicts
             with open(output_path, 'w', encoding='utf-8') as f:
-                json.dump(elements, f, indent=2, ensure_ascii=False)
+                json.dump(data, f, indent=2, ensure_ascii=False)
         else:
+            # Handle other formats
             with open(output_path, 'w', encoding='utf-8') as f:
-                for element in elements:
+                for element in data:
                     if isinstance(element, dict):
                         f.write(f"{element.get('text', '')}\n\n")
                     else:
