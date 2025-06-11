@@ -33,6 +33,29 @@ pip install -r requirements.txt
 
 ## Quick Start
 
+### Command Line Interface
+
+The easiest way to use the Universal Data Loader is through the command line:
+
+```bash
+# Basic usage - load a PDF and save as JSON
+python uloader.py document.pdf -o output.json
+
+# With RAG-optimized settings
+python uloader.py document.pdf -o output.json --preset rag
+
+# Process with custom chunk size and show statistics
+python uloader.py document.pdf -o output.json --chunk-size 800 --stats
+
+# Process entire directory
+python uloader.py documents/ -o results.json --recursive
+
+# Load from URL
+python uloader.py https://example.com/article -o article.json
+```
+
+### Python API
+
 ```python
 from universal_loader import UniversalDataLoader, LoaderConfig
 
@@ -208,7 +231,67 @@ texts = extract_text_only(elements)
 stats = count_elements_by_type(elements)
 ```
 
-## Examples
+## Command Line Interface
+
+### Installation for CLI
+
+To use the CLI globally, you can install the package:
+
+```bash
+# Install in development mode
+pip install -e .
+
+# Now you can use 'uloader' command anywhere
+uloader document.pdf -o output.json
+```
+
+### CLI Examples
+
+```bash
+# Basic document processing
+uloader document.pdf -o output.json
+
+# RAG-optimized processing with statistics
+uloader research_paper.pdf -o chunks.json --preset rag --stats
+
+# Process with custom settings
+uloader document.docx -o output.json \
+  --chunk-strategy by_title \
+  --chunk-size 1000 \
+  --chunk-overlap 150 \
+  --ocr-lang eng,fra
+
+# Process entire directory
+uloader documents/ -o all_docs.json --recursive --verbose
+
+# Extract text only (no metadata)
+uloader document.pdf -o text_only.json --format text --no-metadata
+
+# Process URL content
+uloader https://en.wikipedia.org/wiki/Artificial_intelligence -o ai_article.json
+
+# Use custom configuration file
+uloader document.pdf -o output.json --config my_config.json
+
+# Fast processing for large files
+uloader large_document.pdf -o output.json --preset training --no-metadata
+```
+
+### CLI Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--preset` | Use predefined configuration | `--preset rag` |
+| `--format` | Output format (json/text/elements) | `--format text` |
+| `--chunk-strategy` | Chunking method | `--chunk-strategy by_title` |
+| `--chunk-size` | Maximum chunk size | `--chunk-size 800` |
+| `--chunk-overlap` | Overlap between chunks | `--chunk-overlap 100` |
+| `--ocr-lang` | OCR languages | `--ocr-lang eng,fra,deu` |
+| `--extract-images` | Extract images from docs | `--extract-images` |
+| `--stats` | Show processing statistics | `--stats` |
+| `--verbose` | Detailed output | `--verbose` |
+
+## Python API Examples
 
 Run the example scripts to see the library in action:
 
