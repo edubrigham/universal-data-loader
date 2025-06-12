@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Universal Data Loader Connector
-Drop-in integration for any LLM application
+Connects to the v1.1 REST API.
 
 STANDARD USAGE:
 1. Create a config/ folder in your project root
@@ -27,347 +27,169 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import requests
 
+API_VERSION = "v1"
 
 class UniversalLoaderConnector:
-    """Connector to Universal Data Loader microservice with standard conventions"""
+    """A Python client for the Universal Data Loader microservice."""
     
-    def __init__(self, config_dir: str = "./config"):
-        """
-        Initialize connector
-        
-        Args:
-            config_dir: Directory containing configuration files (default: ./config)
-        """
-        self.config_dir = Path(config_dir)
+    def __init__(self, base_url: str = "http://localhost:8000", api_key: Optional[str] = None):
+        self.base_url = base_url.rstrip('/')
+        self.api_root = f"{self.base_url}/api/{API_VERSION}"
         self.session = requests.Session()
+        
+        # If an API key is provided, set it in the session headers.
+        # This can also be sourced from an environment variable for convenience.
+        key_to_use = api_key or os.getenv("ULOADER_API_KEY")
+        if key_to_use:
+            self.session.headers.update({"x-api-key": key_to_use})
+            
         self.logger = self._setup_logging()
-        
-        # Load main configuration
-        self.config = self._load_config()
-        self.microservice_url = self.config.get("microservice_url", "http://localhost:8000").rstrip('/')
-        
-        # Verify microservice connection
         self._verify_connection()
     
-    def get_documents(self, config_name: str = "documents") -> List[Dict[str, Any]]:
-        """
-        Get processed documents using standard configuration
-        
-        Args:
-            config_name: Name of config file (without .json extension)
-            
-        Returns:
-            List of LangChain-compatible documents
-        """
-        config_file = self.config_dir / f"{config_name}.json"
-        
+    def _get_endpoint(self, path: str) -> str:
+        """Constructs the full API endpoint URL."""
+        return f"{self.api_root}{path}"
+
+    def get_documents_from_config(self, config_path: str, **kwargs) -> List[Dict[str, Any]]:
+        """Processes all sources from a JSON config file."""
+        config_file = Path(config_path)
         if not config_file.exists():
             raise FileNotFoundError(f"Configuration file not found: {config_file}")
-        
-        # Load configuration
-        with open(config_file) as f:
+            
+        with open(config_file, 'r') as f:
             config = json.load(f)
-        
-        sources = config.get("sources", [])
-        processing_config = config.get("processing", {})
-        batch_options = config.get("batch_options", {})
-        
-        self.logger.info(f"Processing {len(sources)} sources from {config_name}.json")
-        
-        # Convert processing config to loader_config format
-        loader_config = {
-            "output_format": processing_config.get("output_format", "documents"),
-            "enable_chunking": processing_config.get("enable_chunking", False),
-            "include_metadata": processing_config.get("include_metadata", True),
-            "min_text_length": processing_config.get("min_text_length", 10),
-            "remove_headers_footers": processing_config.get("remove_headers_footers", True)
-        }
-        
-        # Add chunking parameters only if chunking is enabled
-        if processing_config.get("enable_chunking", False):
-            chunking_strategy = processing_config.get("chunking_strategy")
-            max_chunk_size = processing_config.get("max_chunk_size")
             
-            if not chunking_strategy:
-                raise ValueError("chunking_strategy is required when enable_chunking=True")
-            if not max_chunk_size:
-                raise ValueError("max_chunk_size is required when enable_chunking=True")
-                
-            loader_config["chunking_strategy"] = chunking_strategy
-            loader_config["max_chunk_size"] = max_chunk_size
-            
-            if processing_config.get("chunk_overlap") is not None:
-                loader_config["chunk_overlap"] = processing_config["chunk_overlap"]
+        self.logger.info(f"Processing {len(config.get('sources', []))} sources from '{config_file.name}'...")
         
-        # Remove None values
-        loader_config = {k: v for k, v in loader_config.items() if v is not None}
-        
-        # Prepare batch request
         payload = {
-            "sources": sources,
-            "loader_config": loader_config,
-            "output_config": {
-                "separate_by_source": True,
-                "merge_all": batch_options.get("merge_all", True)
-            },
-            "max_workers": batch_options.get("max_workers", 3),
-            "continue_on_error": batch_options.get("continue_on_error", True)
+            "sources": config.get("sources", []),
+            "loader_config": config.get("processing", {}), # Maps user-friendly 'processing' to 'loader_config'
+            **config.get("batch_options", {}),
+            **kwargs
         }
         
-        # Submit batch job
-        response = self.session.post(f"{self.microservice_url}/process/batch", json=payload)
-        response.raise_for_status()
+        endpoint = self._get_endpoint("/jobs/batch")
+        response = self.session.post(endpoint, json=payload)
         
-        job_id = response.json()["job_id"]
-        self.logger.info(f"Batch job submitted: {job_id}")
-        
-        # Wait for completion and get documents
-        documents = self._wait_and_download(job_id)
-        
-        self.logger.info(f"Successfully processed: {len(documents)} documents")
-        return documents
-    
-    def process_single_url(self, url: str, processing_config: Optional[Dict] = None) -> List[Dict[str, Any]]:
-        """
-        Process a single URL
-        
-        Args:
-            url: URL to process
-            processing_config: Optional processing configuration
+        if response.status_code != 202:
+            raise requests.HTTPError(f"Failed to create batch job: {response.text}")
             
-        Returns:
-            List of LangChain-compatible documents
-        """
-        config = processing_config or self.config.get("processing", {})
-        
-        payload = {"url": url, **config}
-        
-        response = self.session.post(f"{self.microservice_url}/process/url", json=payload)
-        response.raise_for_status()
-        
         job_id = response.json()["job_id"]
-        return self._wait_and_download(job_id)
-    
-    def process_single_file(self, file_path: str, processing_config: Optional[Dict] = None) -> List[Dict[str, Any]]:
-        """
-        Process a single file
+        self.logger.info(f"Batch job '{job_id}' created.")
         
-        Args:
-            file_path: Path to file
-            processing_config: Optional processing configuration
+        return self._wait_for_job_completion(job_id)
+
+    def process_url(self, url: str, config: Optional[Dict] = None, **kwargs) -> List[Dict[str, Any]]:
+        """Processes a single URL."""
+        payload = {"url": url, **(config or {}), **kwargs}
+        endpoint = self._get_endpoint("/jobs/url")
+        response = self.session.post(endpoint, json=payload)
+        
+        if response.status_code != 202:
+            raise requests.HTTPError(f"Failed to create URL job: {response.text}")
             
-        Returns:
-            List of LangChain-compatible documents
-        """
-        config = processing_config or self.config.get("processing", {})
-        
+        job_id = response.json()["job_id"]
+        return self._wait_for_job_completion(job_id)
+
+    def process_file(self, file_path: str, config: Optional[Dict] = None, **kwargs) -> List[Dict[str, Any]]:
+        """Uploads and processes a single file."""
+        if not Path(file_path).exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+            
         with open(file_path, 'rb') as f:
             files = {'file': (Path(file_path).name, f, 'application/octet-stream')}
-            data = {'config': json.dumps(config)}
-            
-            response = self.session.post(f"{self.microservice_url}/process/file", files=files, data=data)
+            data = {'config': json.dumps(config or {}), **kwargs}
+            endpoint = self._get_endpoint("/jobs/file")
+            response = self.session.post(endpoint, files=files, data=data)
         
-        response.raise_for_status()
+        if response.status_code != 202:
+            raise requests.HTTPError(f"Failed to create file job: {response.text}")
+            
         job_id = response.json()["job_id"]
-        return self._wait_and_download(job_id)
-    
-    def health_check(self) -> Dict[str, Any]:
-        """Check microservice health"""
-        response = self.session.get(f"{self.microservice_url}/health")
-        response.raise_for_status()
-        return response.json()
-    
-    def _load_config(self) -> Dict[str, Any]:
-        """Load main configuration file"""
-        config_file = self.config_dir / "documents.json"
-        
-        if not config_file.exists():
-            # Create default config if it doesn't exist
-            default_config = {
-                "microservice_url": "http://localhost:8000",
-                "sources": [],
-                "processing": {
-                    "output_format": "documents",
-                    "include_metadata": True
-                },
-                "batch_options": {
-                    "max_workers": 3,
-                    "continue_on_error": True,
-                    "merge_all": True
-                }
-            }
-            
-            # Create config directory if it doesn't exist
-            self.config_dir.mkdir(parents=True, exist_ok=True)
-            
-            with open(config_file, 'w') as f:
-                json.dump(default_config, f, indent=2)
-            
-            print(f"✅ Created default config at: {config_file}")
-            print("📝 Edit this file to add your document sources")
-            
-            return default_config
-        
-        with open(config_file) as f:
-            return json.load(f)
-    
-    def _verify_connection(self) -> None:
-        """Verify connection to microservice"""
-        try:
-            health = self.health_check()
-            if health.get("status") == "healthy":
-                self.logger.info(f"✅ Connected to Universal Data Loader at {self.microservice_url}")
-            else:
-                raise Exception(f"Service not healthy: {health}")
-        except Exception as e:
-            error_msg = f"❌ Cannot connect to Universal Data Loader at {self.microservice_url}: {e}"
-            self.logger.error(error_msg)
-            raise ConnectionError(error_msg)
-    
-    def _wait_and_download(self, job_id: str, timeout: int = 300) -> List[Dict[str, Any]]:
-        """Wait for job completion and download results"""
+        return self._wait_for_job_completion(job_id)
+
+    def _wait_for_job_completion(self, job_id: str, timeout: int = 300) -> List[Dict[str, Any]]:
+        """Polls for job completion and returns the final documents."""
         start_time = time.time()
+        self.logger.info(f"Waiting for job '{job_id}' to complete...")
         
         while time.time() - start_time < timeout:
-            # Check job status
-            response = self.session.get(f"{self.microservice_url}/jobs/{job_id}")
-            response.raise_for_status()
-            status = response.json()
+            result_endpoint = self._get_endpoint(f"/jobs/{job_id}/result")
+            response = self.session.get(result_endpoint)
             
-            if status["status"] == "completed":
-                # Download documents using the correct endpoint
-                response = self.session.get(f"{self.microservice_url}/jobs/{job_id}/download")
-                response.raise_for_status()
-                result = response.json()
-                
-                # Cleanup job
-                try:
-                    self.session.delete(f"{self.microservice_url}/jobs/{job_id}")
-                except:
-                    pass
-                
-                # Handle different result types
-                if isinstance(result, list):
-                    # Direct list of documents (from file/URL processing)
-                    return result
-                elif isinstance(result, dict):
-                    if "output_files" in result:
-                        # Batch processing result - need to extract documents
-                        # For now, return empty list but log the issue
-                        self.logger.warning(f"Batch processing completed but documents are in files: {result['output_files']}")
-                        # In a real implementation, you'd need to download these files
-                        # For now, let's try a different approach
-                        return []
-                    elif "page_content" in result:
-                        # Single document
-                        return [result]
-                    else:
-                        # Unknown format
-                        self.logger.warning(f"Unknown result format: {list(result.keys())}")
-                        return []
-                else:
-                    return []
+            if response.status_code == 200:
+                self.logger.info(f"Job '{job_id}' completed successfully.")
+                data = response.json()
+                # Assuming the result is in the format {"documents": [...]}
+                return data.get("documents", [])
             
-            elif status["status"] == "failed":
-                error_msg = status.get("error_message", "Unknown error")
-                raise Exception(f"Job failed: {error_msg}")
-            
-            elif status["status"] in ["pending", "processing"]:
-                time.sleep(2)
+            elif response.status_code == 202:
+                # Job is still processing, wait and continue
+                time.sleep(3)
                 continue
             
             else:
-                raise Exception(f"Unknown job status: {status['status']}")
+                # Handle other statuses (404, 500, etc.) as errors
+                response.raise_for_status()
         
-        raise TimeoutError(f"Job timed out after {timeout} seconds")
-    
-    def _setup_logging(self) -> logging.Logger:
-        """Setup logging"""
-        logger = logging.getLogger("universal_loader_connector")
+        raise TimeoutError(f"Job '{job_id}' timed out after {timeout} seconds.")
+
+    def health_check(self, **kwargs) -> Dict[str, Any]:
+        """Checks the health of the microservice."""
+        response = self.session.get(f"{self.base_url}/health")
+        response.raise_for_status()
+        return response.json()
+
+    def _verify_connection(self):
+        """Verifies connection to the microservice."""
+        try:
+            health = self.health_check()
+            if health.get("status") == "healthy":
+                self.logger.info(f"✅ Connected to Universal Data Loader at {self.base_url}")
+            else:
+                raise ConnectionError(f"Service not healthy: {health}")
+        except requests.RequestException as e:
+            raise ConnectionError(f"❌ Cannot connect to Universal Data Loader at {self.base_url}: {e}")
+
+    @staticmethod
+    def _setup_logging() -> logging.Logger:
+        logger = logging.getLogger("UniversalLoaderClient")
         logger.setLevel(logging.INFO)
-        
         if not logger.handlers:
             handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             handler.setFormatter(formatter)
             logger.addHandler(handler)
-        
         return logger
 
 
-# ================================
-# STANDARD API - Drop-in Functions
-# ================================
+# --- Global Instance and Helper Functions ---
+_connector_instance = None
 
-# Global connector instance
-_connector = None
+def _get_connector(**kwargs) -> UniversalLoaderConnector:
+    """Initializes and returns a global connector instance."""
+    global _connector_instance
+    if _connector_instance is None:
+        # Pass kwargs to allow for flexible initialization (e.g., setting api_key)
+        base_url = os.getenv("UNIVERSAL_LOADER_URL", "http://localhost:8000")
+        _connector_instance = UniversalLoaderConnector(base_url=base_url, **kwargs)
+    return _connector_instance
 
-def get_documents(config_name: str = "documents") -> List[Dict[str, Any]]:
-    """
-    STANDARD FUNCTION: Get processed documents
-    
-    This is the main function LLM applications should use.
-    Reads from config/{config_name}.json and returns LangChain documents.
-    
-    Args:
-        config_name: Name of config file (default: "documents")
-        
-    Returns:
-        List of LangChain-compatible documents
-    """
-    global _connector
-    if _connector is None:
-        _connector = UniversalLoaderConnector()
-    
-    return _connector.get_documents(config_name)
+def get_documents_from_config(config_path: str, **kwargs) -> List[Dict[str, Any]]:
+    """Primary function to get documents based on a config file."""
+    return _get_connector(**kwargs).get_documents_from_config(config_path)
 
+def process_url(url: str, config: Optional[Dict] = None, **kwargs) -> List[Dict[str, Any]]:
+    """Helper function to process a single URL."""
+    return _get_connector(**kwargs).process_url(url, config)
 
-def process_url(url: str) -> List[Dict[str, Any]]:
-    """
-    STANDARD FUNCTION: Process a single URL
-    
-    Args:
-        url: URL to process
-        
-    Returns:
-        List of LangChain-compatible documents
-    """
-    global _connector
-    if _connector is None:
-        _connector = UniversalLoaderConnector()
-    
-    return _connector.process_single_url(url)
+def process_file(file_path: str, config: Optional[Dict] = None, **kwargs) -> List[Dict[str, Any]]:
+    """Helper function to process a single file."""
+    return _get_connector(**kwargs).process_file(file_path, config)
 
-
-def process_file(file_path: str) -> List[Dict[str, Any]]:
-    """
-    STANDARD FUNCTION: Process a single file
-    
-    Args:
-        file_path: Path to file
-        
-    Returns:
-        List of LangChain-compatible documents
-    """
-    global _connector
-    if _connector is None:
-        _connector = UniversalLoaderConnector()
-    
-    return _connector.process_single_file(file_path)
-
-
-def health_check() -> Dict[str, Any]:
-    """
-    STANDARD FUNCTION: Check microservice health
-    
-    Returns:
-        Health status information
-    """
-    global _connector
-    if _connector is None:
-        _connector = UniversalLoaderConnector()
-    
-    return _connector.health_check()
+def health_check(**kwargs) -> Dict[str, Any]:
+    """Helper function to check microservice health."""
+    return _get_connector(**kwargs).health_check()
 
 
 # ================================
@@ -387,7 +209,7 @@ if __name__ == "__main__":
         print("\n📄 Testing document processing...")
         
         # This will use config/documents.json
-        documents = get_documents()
+        documents = get_documents_from_config("documents")
         print(f"✅ Processed documents: {len(documents)}")
         
         if documents:

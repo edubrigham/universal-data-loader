@@ -1,0 +1,307 @@
+openapi: 3.1.0
+info:
+  title: Universal Data Loader API
+  version: "1.1.0"
+  description: >
+    A microservice that ingests files, URLs, and batches of data,
+    processes them into LangChain-compatible documents, and returns the results
+    via a job-based asynchronous API.
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      description: Liveness and readiness probe for the service.
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /api/v1/jobs/file:
+    post:
+      summary: Process a Single File
+      tags:
+        - Jobs
+      security:
+        - APIKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '202':
+          description: Job accepted for processing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/jobs/url:
+    post:
+      summary: Process a Single URL
+      tags:
+        - Jobs
+      security:
+        - APIKeyAuth: []
+      requestBody:
+        $ref: '#/components/requestBodies/UrlBody'
+      responses:
+        '202':
+          description: Job accepted for processing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/jobs/batch:
+    post:
+      summary: Process a Batch of Sources
+      tags:
+        - Jobs
+      security:
+        - APIKeyAuth: []
+      description: >
+        Accepts a JSON payload defining multiple sources (URLs, local file paths for the server)
+        to be processed in a single job.
+      requestBody:
+        $ref: '#/components/requestBodies/BatchBody'
+      responses:
+        '202':
+          description: Batch job accepted for processing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/jobs/{job_id}:
+    get:
+      summary: Get Job Status
+      tags:
+        - Jobs
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Current status of the job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      summary: Delete Job and Data
+      tags:
+        - Jobs
+      security:
+        - APIKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '204':
+          description: Job and its associated data have been successfully deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/jobs/{job_id}/result:
+    get:
+      summary: Get Job Result
+      tags:
+        - Jobs
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: The processed documents from a completed job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResult'
+        '202':
+          description: Job is still processing. The response includes the current status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  parameters:
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      description: The unique identifier for a processing job.
+      schema:
+        type: string
+        format: uuid
+
+  requestBodies:
+    UrlBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [url]
+            properties:
+              url:
+                type: string
+                format: uri
+                example: https://www.unstructured.io/
+    BatchBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BatchProcessRequest'
+
+  responses:
+    NotFound:
+      description: The requested resource (e.g., job) could not be found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BadRequest:
+      description: The request was malformed or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          example: healthy
+
+    JobCreated:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        status:
+          type: string
+          example: "pending"
+        links:
+          type: array
+          items:
+            type: object
+            properties:
+              rel:
+                type: string
+                example: "status"
+              href:
+                type: string
+                example: "/api/v1/jobs/123e4567-e89b-12d3-a456-426614174000"
+
+    JobStatus:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        error:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        links:
+          type: array
+          items:
+            type: object
+            properties:
+              rel:
+                type: string
+                example: "result"
+              href:
+                type: string
+                example: "/api/v1/jobs/123e4567-e89b-12d3-a456-426614174000/result"
+
+    JobResult:
+      type: object
+      properties:
+        job_id:
+          type: string
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+
+    Document:
+      type: object
+      properties:
+        page_content:
+          type: string
+          example: "This is the extracted content from the document."
+        metadata:
+          type: object
+          additionalProperties: true
+          example:
+            source: "https://example.com"
+            page_number: 1
+
+    BatchProcessRequest:
+      type: object
+      properties:
+        sources:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [url, file, directory]
+              path:
+                type: string
+        loader_config:
+          type: object
+          additionalProperties: true
+
+    Error:
+      type: object
+      properties:
+        detail:
+          type: string
+          example: "Resource not found"
+
+  securitySchemes:
+    APIKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key 

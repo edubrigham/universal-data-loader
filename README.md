@@ -19,18 +19,22 @@ This microservice provides a REST API that:
 ### Option 1: Docker Compose (Recommended)
 
 ```bash
-# Clone and start the microservice
+# Clone the repository
 git clone <repository-url>
 cd unstructured
 
-# Start the microservice (takes 30 seconds)
-docker-compose up -d
+# Set up your environment configuration
+# This creates a .env file with a secure, random API key.
+cp .env.example .env
+
+# Start the microservice (takes 30-60 seconds on first run)
+docker-compose up --build -d
 
 # Verify it's running
 curl http://localhost:8000/health
 ```
 
-**That's it!** Your microservice is now running at `http://localhost:8000`
+**That's it!** Your microservice is now running at `http://localhost:8000` and is secured with an API key. Your key is stored in the `.env` file.
 
 ### Option 2: Manual Docker Build
 
@@ -57,12 +61,17 @@ The microservice includes a Python connector that makes integration with LLM app
 # Import the connector
 from client.python.universal_loader_connector import get_documents, process_url
 
+# Initialize the connector with your API key
+# The connector will automatically read the ULOADER_API_KEY environment variable
+from universal_loader_client import UnstructuredClient
+client = UnstructuredClient(api_key="YOUR_API_KEY_HERE")
+
 # Example 1: Process documents from configuration
-documents = get_documents()  # Reads config/documents.json
+documents = client.get_documents_from_config("config/documents.json")
 print(f"Loaded {len(documents)} documents for RAG system")
 
 # Example 2: Process a single URL dynamically
-documents = process_url("https://company.com/docs")
+documents = client.process_url("https://company.com/docs")
 
 # Documents are returned in LangChain format - ready for RAG!
 # Use directly with any vector database:
@@ -77,6 +86,7 @@ Create `config/documents.json` to define your document sources:
 ```json
 {
   "microservice_url": "http://localhost:8000",
+  "api_key": "your-secret-api-key-here",
   "sources": [
     {
       "type": "url",
@@ -108,7 +118,8 @@ https://company.com/page3
 Then load all sources at once:
 
 ```python
-documents = get_documents()  # Processes all sources in config
+# The connector can be configured to read the key from the config or an env var.
+documents = get_documents_from_config("config/documents.json")
 ```
 
 ### RAG System Integration Example
@@ -158,90 +169,63 @@ print(f"Answer: {response['result']}")
 
 ## 📡 REST API Documentation
 
-### Health Check
-```bash
-GET /health
-```
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-01-01T12:00:00",
-  "uptime": "running",
-  "active_jobs": 0
-}
-```
+The Universal Data Loader exposes a clean, job-based REST API. All core endpoints are consolidated under the `/api/v1/jobs/` prefix. **Access to endpoints that create or delete jobs requires API key authentication.**
 
-### Process Single File/URL
-```bash
-POST /process/documents
-Content-Type: application/json
+The API key must be sent as a header: `x-api-key: YOUR_SECRET_KEY`
 
-{
-  "source": "https://example.com/document.pdf",
-  "source_type": "url",
-  "output_format": "documents"
-}
-```
+### The Asynchronous Workflow
 
-### Batch Processing
-```bash
-POST /process/batch
-Content-Type: application/json
+1.  **Submit a Job**: `POST` a request to an endpoint (`/file`, `/url`, or `/batch`) to start a processing job.
+2.  **Get a Job ID**: The API immediately returns a `job_id`.
+3.  **Check Status**: `GET /{job_id}` to check if the job is `pending`, `processing`, or `completed`.
+4.  **Get Result**: `GET /{job_id}/result` to download the final LangChain documents.
 
-{
-  "sources": [
-    {"type": "url", "path": "https://site1.com"},
-    {"type": "url", "path": "https://site2.com"}
-  ],
-  "processing": {
-    "output_format": "documents",
-    "include_metadata": true
-  }
-}
-```
+### Key Endpoints
 
-Response:
-```json
-{
-  "job_id": "job_abc123",
-  "status": "completed", 
-  "documents_count": 25,
-  "created_at": "2024-01-01T12:00:00"
-}
-```
+| Endpoint | Method | Description |
+|---|---|---|
+| `GET /health` | `GET` | Checks the health and status of the microservice. |
+| `/api/v1/jobs/file` | `POST` | Process a single file by uploading it in the request body. |
+| `/api/v1/jobs/url` | `POST` | Process a single document from a given URL. |
+| `/api/v1/jobs/batch` | `POST` | Process multiple sources (files, URLs, etc.) in one job. |
+| `/api/v1/jobs/{job_id}` | `GET` | Retrieve the current status of a specific job. |
+| `/api/v1/jobs/{job_id}/result`| `GET` | Retrieve the processed documents for a completed job. |
+| `/api/v1/jobs/{job_id}` | `DELETE`| Clean up all data and files associated with a job. (Auth Required) |
 
-### Get Job Results
-```bash
-GET /jobs/{job_id}/results
-```
 
-### Optional: Document Chunking
-
-By default, documents are returned as complete units to leverage modern LLMs' large context windows. Chunking is available when needed:
+### Example: Processing a URL with `curl`
 
 ```bash
-POST /process/documents
-Content-Type: application/json
+# 1. Set your API Key from your .env file
+API_KEY=$(grep API_SECRET_KEY .env | cut -d '=' -f2)
 
-{
-  "source": "https://example.com/document.pdf",
-  "source_type": "url",
-  "output_format": "documents",
-  "enable_chunking": true,
-  "chunking_strategy": "auto",
-  "max_chunk_size": 1000,
-  "chunk_overlap": 100
-}
+# 2. Submit the URL with the key in the header and get a Job ID
+JOB_ID=$(curl -s -X POST "http://localhost:8000/api/v1/jobs/url" \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: $API_KEY" \
+  -d '{"url": "https://en.wikipedia.org/wiki/Artificial_intelligence"}' | jq -r .job_id)
+
+echo "Processing with Job ID: $JOB_ID"
+
+# 3. Poll for completion (publicly accessible)
+sleep 5 
+curl -s "http://localhost:8000/api/v1/jobs/$JOB_ID" | jq .status
+
+# 4. Download the final result (publicly accessible)
+curl -s "http://localhost:8000/api/v1/jobs/$JOB_ID/result" | jq .
 ```
 
-**Chunking Control:**
-- `enable_chunking: false` (default) - Returns complete documents
-- `enable_chunking: true` - Requires `chunking_strategy` and `max_chunk_size`
+### Document Processing Issues
+```bash
+# Check specific job status
+curl http://localhost:8000/api/v1/jobs/{job_id}
 
-**When to use chunking:**
-- Working with older LLMs with limited context windows
-- Building vector databases that require smaller segments
-- Processing extremely large documents that exceed context limits
+# Test with simple URL (replace YOUR_API_KEY with your actual key)
+curl -X POST http://localhost:8000/api/v1/jobs/url \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -d '{"url": "https://httpbin.org/html"}'
+```
 
 ---
 
@@ -249,17 +233,17 @@ Content-Type: application/json
 
 ### Environment Variables
 
-```bash
-# .env file
-PORT=8000
-HOST=0.0.0.0
-DEBUG=false
-ENVIRONMENT=production
+The primary method of configuration is via a `.env` file in the project root. You can create one by copying the provided example:
 
-# Optional: Configure document processing
-DEFAULT_OUTPUT_FORMAT=documents
-ENABLE_CHUNKING=false
+```bash
+cp .env.example .env
 ```
+
+The server will automatically load the following variables from this file:
+
+- `API_SECRET_KEY`: **(Required)** A secure, unique key that clients must provide in the `x-api-key` header to access protected endpoints.
+- `PORT`: The port on which the microservice will run. Defaults to `8000`.
+- `ENVIRONMENT`: Set to `development` to enable features like auto-reloading. Defaults to `production`.
 
 ### Docker Compose Configuration
 
@@ -453,17 +437,6 @@ lsof -i :8000
 
 # Test with minimal config
 curl http://localhost:8000/health
-```
-
-### Document Processing Issues
-```bash
-# Check specific job status
-curl http://localhost:8000/jobs/{job_id}/status
-
-# Test with simple URL
-curl -X POST http://localhost:8000/process/documents \
-  -H "Content-Type: application/json" \
-  -d '{"source": "https://httpbin.org/html", "source_type": "url"}'
 ```
 
 ### Integration Issues
